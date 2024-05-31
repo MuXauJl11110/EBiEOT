@@ -117,16 +117,16 @@ class LightGCOT(nn.Module):
     ) -> torch.Tensor:
         if self.A_diagonal_init is not None and self.B_diagonal_init is not None:
             diff = (
-                batched_x[None, None, :, :] - g_x[:, :, None, :]
-            )  # [1 x 1 x bs x x_dim] + [N x M x 1 x x_dim] = [N x M x bs x x_dim]
-            return -0.5 / self.epsilon * torch.sum(diff * G_xx[:, :, None, :] * diff, dim=(2, 3))  # [N x M]
+                batched_x[:, None, None, :] - g_x[None, :, :, :]
+            )  # [bs x 1 x 1 x x_dim] + [1 x N x M x x_dim] = [bs x N x M x x_dim]
+            return -0.5 / self.epsilon * torch.sum(diff * G_xx[None, :, :, :] * diff, dim=(3))  # [bs x N x M]
 
     def compute_primal_potential(self, batched_y: torch.Tensor) -> float:
-        diff = batched_y[None, :, :] - self.a_y[:, None, :]  # [1 x bs x y_dim] - [N x 1 x y_dim] = [N x bs x y_dim]
+        diff = batched_y[:, None, :] - self.a_y[None, :, :]  # [bs x 1 x y_dim] - [1 x N x y_dim] = [bs x N x y_dim]
         log_quadratic = (
-            -0.5 / self.epsilon * torch.sum(diff * self.A_yy_diagonal_matrix[:, None, :] * diff, dim=(1, 2))
-        )
-        return self.epsilon * torch.log(torch.sum(torch.exp(self.log_w + log_quadratic)))
+            -0.5 / self.epsilon * torch.sum(diff * self.A_yy_diagonal_matrix[None, :, :] * diff, dim=2)
+        )  # [bs x N]
+        return self.epsilon * torch.log(torch.sum(torch.exp(self.log_w[None, :] + log_quadratic), dim=1))  # [bs]
 
     def compute_dual_potential(self, batched_x: torch.Tensor) -> float:
         G_xx, G_xy, G_yx, G_yy = self.compute_G()
@@ -134,7 +134,7 @@ class LightGCOT(nn.Module):
         log_alpha = self.compute_log_alpha(G_xx, G_xy, G_yx, G_yy)
         log_quadratic = self.compute_log_quadratic(batched_x, g_x, G_xx, G_xy, G_yx, G_yy)
 
-        return -self.epsilon * torch.log(torch.sum(torch.exp(log_alpha + log_quadratic)))
+        return -self.epsilon * torch.log(torch.sum(torch.exp(log_alpha + log_quadratic), dim=(1, 2)))
 
     def set_epsilon(self, new_epsilon):
         self.epsilon = torch.tensor(new_epsilon, device=self.epsilon.device)
