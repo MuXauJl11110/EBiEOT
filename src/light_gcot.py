@@ -58,19 +58,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         # epsilonI = self.epsilon * torch.ones(self.m_potentials // 2, self.y_dim)
         # return torch.cat((epsilonI, epsilonI)).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
-        return (self.epsilon * torch.ones(self.y_dim)).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
-
-    def compute_G_nm(self, B_m: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Computes G_{nm}, G_{nm}^{-1}, (G_{nm} + G_{nm}^\top)^{-1}. TODO: think about memory
-        """
-        if self.A_diagonal_init is not None and self.is_B_diagonal:
-            G = self.A_diagonal_matrix[None, :, None, :] + B_m[:, None, :, :]
-            # [1 x N x 1 x y_dim] + [bs x 1 x M x y_dim] = [bs x N x M x y_dim]
-            G_inv = 1 / G
-            return G, G_inv, 0.5 * G_inv
-        else:
-            raise NotImplementedError("Other options are not implemented yet!")
+        return (torch.ones(self.y_dim)).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
 
     def compute_b_nm(self, b_m: torch.Tensor, B_m: torch.Tensor) -> tuple[torch.Tensor]:
         if self.A_diagonal_init is not None and self.is_B_diagonal:
@@ -88,6 +76,18 @@ class LightGCOT(nn.Module):
                 (self.a * self.A_diagonal_matrix * self.a)[None, :, None, :] + bT_B_b[:, None, :, :], dim=3
             )
             # sum([1 x N x 1 x y_dim] + [bs x 1 x M x y_dim], dim=3) = sum([bs x N x M x y_dim], dim=3) = [bs x N x M]
+        else:
+            raise NotImplementedError("Other options are not implemented yet!")
+
+    def compute_G_nm(self, B_m: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Computes G_{nm}, G_{nm}^{-1}, (G_{nm} + G_{nm}^\top)^{-1}. TODO: think about memory
+        """
+        if self.A_diagonal_init is not None and self.is_B_diagonal:
+            G = self.A_diagonal_matrix[None, :, None, :] + B_m[:, None, :, :]
+            # [1 x N x 1 x y_dim] + [bs x 1 x M x y_dim] = [bs x N x M x y_dim]
+            G_inv = 1 / G
+            return G, G_inv, 0.5 * G_inv
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
@@ -124,7 +124,7 @@ class LightGCOT(nn.Module):
             return (
                 log_alpha_nm + 0.5 / self.epsilon * torch.sum(g_nm * G_nm * g_nm, dim=3) - torch.log(Z)[:, None, None]
             )
-            # [bs x N x M] + [bs x N x M] x [bs x 1 x 1]
+            # [bs x N x M] + [bs x N x M] x [bs x 1 x 1] = [bs x N x M]
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
@@ -142,6 +142,7 @@ class LightGCOT(nn.Module):
         b_nm = self.compute_b_nm(b_m, B_m)  # [bs x N x M x y_dim]
         c_nm = self.compute_c_nm(b_m, B_m)  # [bs x N x M]
         G_nm, G_inv_nm, _ = self.compute_G_nm(B_m)  # [bs x N x M x y_dim], [bs x N x M x y_dim], _
+        assert torch.min(G_nm) > 0
         log_v_m = self.compute_log_v_m(batched_x)  # [bs x M]
         log_alpha_nm = self.compute_log_alpha_nm(log_v_m, B_m, G_nm, c_nm)  # [bs x N x M]
         Z = self.compute_Z(log_alpha_nm, G_inv_nm, b_nm)
