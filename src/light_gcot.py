@@ -66,20 +66,19 @@ class LightGCOT(nn.Module):
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         batch_size = batched_x.shape[0]
-        # return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)  # [bs x M]
-        return 0.5 * self.y_dim * torch.log(2 * torch.pi * self.epsilon) * torch.ones(batch_size, self.m_potentials)
+        return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)  # [bs x M]
+        # return 0.5 * self.y_dim * torch.log(2 * torch.pi * self.epsilon) * torch.ones(batch_size, self.m_potentials)
 
     def compute_b_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         # TODO: make general case
-        # return torch.stack((batched_x, -batched_x), dim=1)  # [bs x M x y_dim]
-        batch_size = batched_x.shape[0]
-        return batched_x.view(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
+        # batch_size = batched_x.shape[0]
+        # return batched_x.view(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
+        return torch.stack((batched_x, -batched_x), dim=1)  # [bs x M x y_dim]
 
     def compute_B_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         batch_size = batched_x.shape[0]
-        # epsilonI = self.epsilon * torch.ones(self.m_potentials // 2, self.y_dim)
-        # return torch.cat((epsilonI, epsilonI)).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
-        self.B_m = torch.ones(batch_size, 1, self.y_dim)
+        self.B_m = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
+        # self.B_m = torch.ones(batch_size, 1, self.y_dim)
         return self.B_m  # [bs x M x y_dim]
 
     def compute_b_nm(self, b_m: torch.Tensor, B_m: torch.Tensor) -> tuple[torch.Tensor]:
