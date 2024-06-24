@@ -47,10 +47,10 @@ class LightGCOT(nn.Module):
             self.A_diagonal_matrix = nn.Parameter(
                 nn.functional.softplus(A_diagonal_init * torch.ones(n_potentials, y_dim))
             )
-        if self.m_potentials > 2:
+        if self.m_potentials not in {1, 2, 4}:
             self.log_v_m = nn.Sequential(
                 torchvision.ops.MLP(in_channels=x_dim, hidden_channels=[m_potentials], activation_layer=torch.nn.ReLU),
-                nn.Softplus(),
+                nn.LogSoftmax(dim=-1),
             )
             self.b_m = torchvision.ops.MLP(
                 in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
@@ -79,10 +79,10 @@ class LightGCOT(nn.Module):
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         batch_size = batched_x.shape[0]
-        if self.m_potentials in (1, 2):
+        if self.m_potentials in {1, 2, 4}:
             return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)  # [bs x M]
         else:
-            return torch.log(self.log_v_m(batched_x))
+            return self.log_v_m(batched_x)
 
     def compute_b_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         # TODO: make general case
@@ -91,17 +91,19 @@ class LightGCOT(nn.Module):
             return batched_x.view(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
         elif self.m_potentials == 2:
             return torch.stack((batched_x, -batched_x), dim=1)  # [bs x M x y_dim]
+        elif self.m_potentials == 4:
+            return torch.stack((batched_x, -batched_x, 0.5 * batched_x, 2 * batched_x), dim=1)  # [bs x M x y_dim]
         else:
             return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)  # [bs x M x y_dim]
 
     def compute_B_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         batch_size = batched_x.shape[0]
-        if self.m_potentials == 1:
-            self.B_m_matrix = torch.ones(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
-        elif self.m_potentials == 2:
+        if self.m_potentials in {1, 2, 4}:
             self.B_m_matrix = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
         else:
-            # self.B_m_matrix = self.B_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
+            # self.B_m_matrix = nn.functional.softmax(
+            #     self.B_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim), dim=1
+            # )  # [bs x M x y_dim]
             self.B_m_matrix = nn.functional.softplus(
                 self.B_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
             )  # [bs x M x y_dim]
