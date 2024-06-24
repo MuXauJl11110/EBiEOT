@@ -1,4 +1,5 @@
 import torch
+import torchvision
 from torch import nn
 from torch.distributions.categorical import Categorical
 from torch.distributions.independent import Independent
@@ -43,7 +44,22 @@ class LightGCOT(nn.Module):
         self.log_w = nn.Parameter(torch.log(torch.ones(n_potentials) / n_potentials))
         self.a = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
-            self.A_diagonal_matrix = nn.Parameter(A_diagonal_init * torch.ones(n_potentials, y_dim))
+            self.A_diagonal_matrix = nn.Parameter(
+                nn.functional.softplus(A_diagonal_init * torch.ones(n_potentials, y_dim))
+            )
+        if self.m_potentials > 2:
+            self.log_v_m = nn.Sequential(
+                torchvision.ops.MLP(in_channels=x_dim, hidden_channels=[m_potentials], activation_layer=torch.nn.ReLU),
+                nn.Softplus(),
+            )
+            self.b_m = torchvision.ops.MLP(
+                in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
+            )
+            self.B_m = torch.nn.Sequential(
+                torchvision.ops.MLP(
+                    in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
+                ),
+            )
 
     def init_a_by_samples(self, samples):
         assert samples.shape[0] == self.a.shape[0]
@@ -51,35 +67,45 @@ class LightGCOT(nn.Module):
         self.a.data = torch.clone(samples.to(self.a.device))
 
     def compute_cost(
-        self, batched_y: torch.Tensor, log_v_m: torch.Tensor, B_m: torch.Tensor, b_m: torch.Tensor
+        self, batched_y: torch.Tensor, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor
     ) -> torch.Tensor:
         if self.A_diagonal_init is not None and self.is_B_diagonal:
-            diff = batched_y[:, None, :] - b_m  # [bs x 1 x y_dim] - [bs x M x y_dim] = [bs x M x y_dim]
-            return -self.epsilon * torch.logsumexp(
-                log_v_m
-                - 0.5 * self.y_dim * torch.log(2 * torch.pi * self.epsilon)
-                - 0.5 / self.epsilon * torch.sum(diff * B_m * diff, dim=2),
-                dim=1,
-            )  # sum([bs x M] + sum([bs x M x y_dim] * [bs x M x y_dim] * [bs x M x y_dim], dim=2), dim=1) = [bs]
+            mix = Categorical(logits=log_v_m)  # [bs x M]
+            comp = Independent(Normal(loc=b_m, scale=torch.sqrt(self.epsilon * B_m)), 1)  # [bs x M x y_dim]
+            gmm = MixtureSameFamily(mix, comp)
+            return -self.epsilon * gmm.log_prob(batched_y)  # [bs]
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         batch_size = batched_x.shape[0]
-        return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)  # [bs x M]
-        # return 0.5 * self.y_dim * torch.log(2 * torch.pi * self.epsilon) * torch.ones(batch_size, self.m_potentials)
+        if self.m_potentials in (1, 2):
+            return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)  # [bs x M]
+        else:
+            return torch.log(self.log_v_m(batched_x))
 
     def compute_b_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         # TODO: make general case
-        # batch_size = batched_x.shape[0]
-        # return batched_x.view(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
-        return torch.stack((batched_x, -batched_x), dim=1)  # [bs x M x y_dim]
+        batch_size = batched_x.shape[0]
+        if self.m_potentials == 1:
+            return batched_x.view(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
+        elif self.m_potentials == 2:
+            return torch.stack((batched_x, -batched_x), dim=1)  # [bs x M x y_dim]
+        else:
+            return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)  # [bs x M x y_dim]
 
     def compute_B_m(self, batched_x: torch.Tensor) -> torch.Tensor:
         batch_size = batched_x.shape[0]
-        self.B_m = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
-        # self.B_m = torch.ones(batch_size, 1, self.y_dim)
-        return self.B_m  # [bs x M x y_dim]
+        if self.m_potentials == 1:
+            self.B_m_matrix = torch.ones(batch_size, 1, self.y_dim)  # [bs x M x y_dim]
+        elif self.m_potentials == 2:
+            self.B_m_matrix = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1)  # [bs x M x y_dim]
+        else:
+            # self.B_m_matrix = self.B_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
+            self.B_m_matrix = nn.functional.softplus(
+                self.B_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
+            )  # [bs x M x y_dim]
+        return self.B_m_matrix
 
     def compute_b_nm(self, b_m: torch.Tensor, B_m: torch.Tensor) -> tuple[torch.Tensor]:
         if self.A_diagonal_init is not None and self.is_B_diagonal:
@@ -147,11 +173,7 @@ class LightGCOT(nn.Module):
             )  # [bs x N]
             return self.epsilon * torch.logsumexp(self.log_w[None, :] + log_quadratic, dim=1)  # [bs]
 
-    def compute_dual_potential(self, batched_x: torch.Tensor) -> float:
-        B_m = self.compute_B_m(batched_x)  # [bs x M x y_dim]
-        b_m = self.compute_b_m(batched_x)  # [bs x M x y_dim]
-        log_v_m = self.compute_log_v_m(batched_x)  # [bs x M]
-
+    def compute_dual_potential(self, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor) -> float:
         G_nm, G_inv_nm = self.compute_G_nm(B_m)
         c_nm = self.compute_c_nm(b_m, B_m)
         b_nm = self.compute_b_nm(b_m, B_m)

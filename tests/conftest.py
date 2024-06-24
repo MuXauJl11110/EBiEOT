@@ -6,7 +6,7 @@ from src.light_gcot import LightGCOT
 x_dim_list = [5]
 y_dim_list = [5]
 n_potentials_list = [200]
-m_potentials_list = [300]
+m_potentials_list = [1, 2, 300]
 A_diagonal_init_list = [0.1]
 is_B_diagonal_list = [True]
 batch_size_list = [128]
@@ -58,8 +58,18 @@ def B_m(batch_size: int, m_potentials: int, y_dim: int):
 
 
 @pytest.fixture
-def log_v_m(batch_size: int, m_potentials: int, y_dim: int):
+def log_v_m(batch_size: int, m_potentials: int):
     return torch.rand(batch_size, m_potentials)
+
+
+@pytest.fixture
+def batched_y(batch_size: int, y_dim: int):
+    return torch.randn((batch_size, y_dim))
+
+
+@pytest.fixture
+def batched_x(batch_size: int, x_dim: int):
+    return torch.randn((batch_size, x_dim))
 
 
 @pytest.fixture
