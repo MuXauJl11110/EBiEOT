@@ -46,9 +46,6 @@ class LightGCOT(nn.Module):
         self.a = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
             self.A_diagonal_matrix = nn.Parameter(A_diagonal_init * torch.ones(n_potentials, y_dim))
-            # self.A_diagonal_matrix = nn.Parameter(
-            #     nn.functional.softmax(A_diagonal_init * torch.ones(n_potentials, y_dim), dim=0)
-            # )
 
         self.m_potentials_custom_set = {1, 2}
         self.cost_function = cost_function
@@ -66,7 +63,7 @@ class LightGCOT(nn.Module):
         elif self.cost_function == "parameters":
             self.log_v_m = nn.Parameter(torch.log(torch.ones(m_potentials) / m_potentials))
             self.b_m = nn.Parameter(torch.randn(m_potentials, y_dim))
-            self.B_m = nn.Parameter(torch.ones(m_potentials, y_dim) / m_potentials)
+            self.B_m = nn.Parameter(torch.ones(m_potentials, y_dim))
         elif self.cost_function == "MLP":
             self.log_v_m = nn.Sequential(
                 torchvision.ops.MLP(in_channels=x_dim, hidden_channels=[m_potentials], activation_layer=torch.nn.ReLU),
