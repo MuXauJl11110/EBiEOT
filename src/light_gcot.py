@@ -47,12 +47,23 @@ class LightGCOT(nn.Module):
         if A_diagonal_init is not None:
             self.A_diagonal_matrix = nn.Parameter(A_diagonal_init * torch.ones(n_potentials, y_dim))
 
-        self.m_potentials_custom_set = {1, 2}
+        self.known_costs = {
+            "l2",
+            "Alexander's",
+            "uniform_on_circle",
+            "uniform_on_circle_plus_x",
+            "B_m_parameter",
+        }
         self.cost_function = cost_function
-        if self.cost_function == "uniform_on_circle":
+        if self.cost_function not in self.known_costs:
+            raise NotImplementedError(f"Cost function: {self.cost_function} not implemented yet!")
+
+        self.log_v_m = torch.log(torch.ones(self.m_potentials) / self.m_potentials)
+        self.B_m = torch.ones(self.m_potentials, self.y_dim)
+        if self.cost_function == "uniform_on_circle" or "uniform_on_circle_plus_x":
             t = torch.arange(0, self.m_potentials) / m_potentials
             R = 2
-            D = torch.tensor([[1.0, 0], [0, 1.0]])
+            D = torch.tensor([[0.1, 0], [0, 10.0]])
             c, s = torch.cos(2 * torch.pi * t.squeeze()), torch.sin(2 * torch.pi * t.squeeze())
             x, y = R * c, R * s
             self.b_m = torch.stack([x, y]).T
@@ -60,6 +71,10 @@ class LightGCOT(nn.Module):
             QT_D = torch.bmm(Q.permute(0, 2, 1), D.unsqueeze(0).repeat(self.m_potentials, 1, 1))
             QTDQ = torch.bmm(QT_D, Q)
             self.B_m = torch.diagonal(QTDQ, dim1=1, dim2=2)
+        elif self.cost_function == "B_m_parametrization":
+            self.log_v_m = torch.log(torch.ones(m_potentials) / m_potentials)
+            self.b_m = torch.randn(m_potentials, y_dim)
+            self.B_m = nn.Parameter(torch.log(torch.ones(m_potentials, y_dim)))
         elif self.cost_function == "parameters":
             self.log_v_m = nn.Parameter(torch.log(torch.ones(m_potentials) / m_potentials))
             self.b_m = nn.Parameter(torch.randn(m_potentials, y_dim))
@@ -96,11 +111,13 @@ class LightGCOT(nn.Module):
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M]
         batch_size = batched_x.shape[0]
-        if self.m_potentials in self.m_potentials_custom_set:
-            return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)
-        elif self.cost_function == "uniform_on_circle":
-            return torch.log(torch.ones(self.m_potentials) / self.m_potentials).repeat(batch_size, 1)
-        elif self.cost_function == "parameters":
+        if self.cost_function in {
+            "l2",
+            "Alexander's",
+            "uniform_on_circle",
+            "uniform_on_circle_plus_x",
+            "B_m_parameter",
+        }:
             return self.log_v_m.repeat(batch_size, 1)
         elif self.cost_function == "MLP":
             return self.log_v_m(batched_x)
@@ -109,14 +126,16 @@ class LightGCOT(nn.Module):
 
     def compute_b_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M x y_dim]
         batch_size = batched_x.shape[0]
-        if self.m_potentials == 1:
+        if self.cost_function == "l2":
+            assert self.m_potentials == 1
             return batched_x.view(batch_size, 1, self.y_dim)
-        elif self.m_potentials == 2:
+        elif self.cost_function == "Alexander's":
+            assert self.m_potentials == 2
             return torch.stack((batched_x, -batched_x), dim=1)
-        elif self.cost_function == "uniform_on_circle":
+        elif self.cost_function in {"uniform_on_circle", "uniform_on_circle_plus_x", "parameters"}:
             return self.b_m.repeat(batch_size, 1, 1)
-        elif self.cost_function == "parameters":
-            return self.b_m.repeat(batch_size, 1, 1)
+        elif self.cost_function == "B_m_parametrization":
+            return batched_x[:, None, :].repeat(1, self.m_potentials, 1)
         elif self.cost_function == "MLP":
             return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
         else:
@@ -124,12 +143,12 @@ class LightGCOT(nn.Module):
 
     def compute_B_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M x y_dim]
         batch_size = batched_x.shape[0]
-        if self.m_potentials in self.m_potentials_custom_set:
-            self.B_m_matrix = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1)
-        elif self.cost_function == "uniform_on_circle":
+        if self.cost_function in {"l2", "Alexander's", "uniform_on_circle", "B_m_parametrization"}:
             self.B_m_matrix = self.B_m.repeat(batch_size, 1, 1)
-        elif self.cost_function == "parameters":
-            self.B_m_matrix = self.B_m.repeat(batch_size, 1, 1)
+        elif self.cost_function == "uniform_on_circle_plus_x":
+            self.B_m_matrix = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1) + self.B_m.repeat(
+                batch_size, 1, 1
+            )
         elif self.cost_function == "MLP":
             self.B_m_matrix = self.B_m.repeat(batch_size, 1, 1)
             self.B_m_matrix = nn.functional.softmax(
