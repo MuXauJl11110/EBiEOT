@@ -4,6 +4,7 @@ import numpy as np
 import torch
 from scipy.linalg import sqrtm
 from sklearn import datasets
+from torch.distributions.multivariate_normal import MultivariateNormal
 
 
 class Sampler:
@@ -62,12 +63,41 @@ class SwissRollSampler(Sampler):
 
 
 class StandardNormalSampler(Sampler):
-    def __init__(self, dim=1, device="cuda"):
+    def __init__(self, dim: int = 1, device: str = "cuda"):
         super(StandardNormalSampler, self).__init__(device=device)
         self.dim = dim
 
     def sample(self, batch_size=10):
         return torch.randn(batch_size, self.dim, device=self.device)
+
+
+class StandardNormalOnCircleSampler(Sampler):
+    def __init__(self, R: float, D: torch.Tensor, device: str = "cuda"):
+        super(StandardNormalOnCircleSampler, self).__init__(device=device)
+        self.R = R
+        self.D = D
+
+    def compute(self, t: torch.Tensor, diag: bool = False) -> tuple[torch.Tensor, torch.Tensor]:
+        assert len(t.shape) == 1  # t shape batch*1
+
+        c, s = torch.cos(2 * torch.pi * t.squeeze()), torch.sin(2 * torch.pi * t.squeeze())
+        x, y = self.R * c, self.R * s
+        a = torch.stack([x, y]).T
+        Q = torch.stack([torch.stack([c, -s]), torch.stack([s, c])]).permute(2, 0, 1)
+
+        QT_D = torch.bmm(Q.permute(0, 2, 1), self.D.unsqueeze(0).repeat(t.shape[0], 1, 1))
+        QTDQ = torch.bmm(QT_D, Q)
+
+        if diag:
+            QTDQ = torch.diagonal(QTDQ, dim1=1, dim2=2)
+
+        return a, QTDQ
+
+    def sample(self, t: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        loc, covariance_matrix = self.compute(t)
+        mn = MultivariateNormal(loc=loc, covariance_matrix=covariance_matrix)
+
+        return mn.sample()
 
 
 class SwissRollSampler(Sampler):

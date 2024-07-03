@@ -6,6 +6,8 @@ from torch.distributions.independent import Independent
 from torch.distributions.mixture_same_family import MixtureSameFamily
 from torch.distributions.normal import Normal
 
+from src.distributions import StandardNormalOnCircleSampler
+
 
 class LightGCOT(nn.Module):
     def __init__(
@@ -52,7 +54,10 @@ class LightGCOT(nn.Module):
             "Alexander's",
             "uniform_on_circle",
             "uniform_on_circle_plus_x",
-            "B_m_parameter",
+            "double_uniform_on_circle_plus_x",
+            "B_m_parametrization",
+            "parameters",
+            "MLP",
         }
         self.cost_function = cost_function
         if self.cost_function not in self.known_costs:
@@ -60,21 +65,23 @@ class LightGCOT(nn.Module):
 
         self.log_v_m = torch.log(torch.ones(self.m_potentials) / self.m_potentials)
         self.B_m = torch.ones(self.m_potentials, self.y_dim)
-        if self.cost_function == "uniform_on_circle" or "uniform_on_circle_plus_x":
+        if self.cost_function in {"uniform_on_circle", "uniform_on_circle_plus_x"}:
             t = torch.arange(0, self.m_potentials) / m_potentials
-            R = 2
-            D = torch.tensor([[0.1, 0], [0, 10.0]])
-            c, s = torch.cos(2 * torch.pi * t.squeeze()), torch.sin(2 * torch.pi * t.squeeze())
-            x, y = R * c, R * s
-            self.b_m = torch.stack([x, y]).T
-            Q = torch.stack([torch.stack([c, -s]), torch.stack([s, c])]).permute(2, 0, 1)
-            QT_D = torch.bmm(Q.permute(0, 2, 1), D.unsqueeze(0).repeat(self.m_potentials, 1, 1))
-            QTDQ = torch.bmm(QT_D, Q)
-            self.B_m = torch.diagonal(QTDQ, dim1=1, dim2=2)
+            R, D = 2, torch.tensor([[0.1, 0], [0, 10]])
+            self.b_m, self.B_m = StandardNormalOnCircleSampler(R, D).compute(t, diag=True)
+        elif self.cost_function == "double_uniform_on_circle_plus_x":
+            num_t = self.m_potentials // 2
+            t = torch.arange(0, num_t) / num_t
+            D = torch.tensor([[0.1, 0], [0, 10]])
+            b_m_1, B_m_1 = StandardNormalOnCircleSampler(1, D).compute(t, diag=True)
+            b_m_2, B_m_2 = StandardNormalOnCircleSampler(2, D).compute(t, diag=True)
+            self.b_m = torch.cat((b_m_1, b_m_2), dim=0)
+            self.B_m = torch.cat((B_m_1, B_m_2), dim=0)
         elif self.cost_function == "B_m_parametrization":
             self.log_v_m = torch.log(torch.ones(m_potentials) / m_potentials)
             self.b_m = torch.randn(m_potentials, y_dim)
-            self.B_m = nn.Parameter(torch.log(torch.ones(m_potentials, y_dim)))
+            self.B_m = nn.Parameter(torch.exp(torch.ones(m_potentials, y_dim)))
+            self.A_diagonal_matrix = nn.Parameter(torch.exp(A_diagonal_init * torch.ones(n_potentials, y_dim)))
         elif self.cost_function == "parameters":
             self.log_v_m = nn.Parameter(torch.log(torch.ones(m_potentials) / m_potentials))
             self.b_m = nn.Parameter(torch.randn(m_potentials, y_dim))
@@ -85,13 +92,9 @@ class LightGCOT(nn.Module):
                 nn.LogSoftmax(dim=-1),
             )
             self.b_m = torchvision.ops.MLP(
-                in_channels=x_dim, hidden_channels=[m_potentials * x_dim], activation_layer=torch.nn.ReLU
+                in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
             )
-            self.B_m = torch.nn.Sequential(
-                torchvision.ops.MLP(
-                    in_channels=x_dim, hidden_channels=[m_potentials * x_dim], activation_layer=torch.nn.ReLU
-                ),
-            )
+            self.B_m = nn.Parameter(torch.ones(m_potentials, y_dim))
 
     def init_a_by_samples(self, samples):
         assert samples.shape[0] == self.a.shape[0]
@@ -99,15 +102,25 @@ class LightGCOT(nn.Module):
         self.a.data = torch.clone(samples.to(self.a.device))
 
     def compute_cost(
-        self, batched_y: torch.Tensor, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor
+        self,
+        b_m: torch.Tensor,
+        B_m: torch.Tensor,
+        log_v_m: torch.Tensor,
+        sample: bool = False,
+        batched_y: torch.Tensor | None = None,
     ) -> torch.Tensor:  # -> [bs]
+        if batched_y is None and not sample:
+            raise ValueError("You must specify 'batched_y' argument!")
         if self.A_diagonal_init is not None and self.is_B_diagonal:
             mix = Categorical(logits=log_v_m)
             comp = Independent(Normal(loc=b_m, scale=torch.sqrt(self.epsilon * B_m)), 1)
             gmm = MixtureSameFamily(mix, comp)
-            return -self.epsilon * gmm.log_prob(batched_y)
         else:
             raise NotImplementedError("Other options are not implemented yet!")
+        if sample:
+            return gmm.sample()
+        else:
+            return -self.epsilon * gmm.log_prob(batched_y)
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M]
         batch_size = batched_x.shape[0]
@@ -116,7 +129,9 @@ class LightGCOT(nn.Module):
             "Alexander's",
             "uniform_on_circle",
             "uniform_on_circle_plus_x",
-            "B_m_parameter",
+            "double_uniform_on_circle_plus_x",
+            "B_m_parametrization",
+            "parameters",
         }:
             return self.log_v_m.repeat(batch_size, 1)
         elif self.cost_function == "MLP":
@@ -132,8 +147,10 @@ class LightGCOT(nn.Module):
         elif self.cost_function == "Alexander's":
             assert self.m_potentials == 2
             return torch.stack((batched_x, -batched_x), dim=1)
-        elif self.cost_function in {"uniform_on_circle", "uniform_on_circle_plus_x", "parameters"}:
+        elif self.cost_function in {"uniform_on_circle", "parameters"}:
             return self.b_m.repeat(batch_size, 1, 1)
+        elif self.cost_function in {"uniform_on_circle_plus_x", "double_uniform_on_circle_plus_x"}:
+            return self.b_m.repeat(batch_size, 1, 1) + batched_x[:, None, :].repeat(1, self.m_potentials, 1)
         elif self.cost_function == "B_m_parametrization":
             return batched_x[:, None, :].repeat(1, self.m_potentials, 1)
         elif self.cost_function == "MLP":
@@ -143,17 +160,17 @@ class LightGCOT(nn.Module):
 
     def compute_B_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M x y_dim]
         batch_size = batched_x.shape[0]
-        if self.cost_function in {"l2", "Alexander's", "uniform_on_circle", "B_m_parametrization"}:
+        if self.cost_function in {
+            "l2",
+            "Alexander's",
+            "uniform_on_circle",
+            "uniform_on_circle_plus_x",
+            "double_uniform_on_circle_plus_x",
+            "B_m_parametrization",
+            "parameters",
+            "MLP",
+        }:
             self.B_m_matrix = self.B_m.repeat(batch_size, 1, 1)
-        elif self.cost_function == "uniform_on_circle_plus_x":
-            self.B_m_matrix = torch.ones(self.m_potentials, self.y_dim).repeat(batch_size, 1, 1) + self.B_m.repeat(
-                batch_size, 1, 1
-            )
-        elif self.cost_function == "MLP":
-            self.B_m_matrix = self.B_m.repeat(batch_size, 1, 1)
-            self.B_m_matrix = nn.functional.softmax(
-                self.B_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim), dim=1
-            )
         else:
             raise NotImplementedError("Other options are not implemented yet!")
         return self.B_m_matrix
