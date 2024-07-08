@@ -15,13 +15,13 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Im
     axes[0].scatter(np.arange(model.n_potentials), model.log_w.cpu().detach().numpy(), color=color)
     axes[0].set_xlabel("x")
     axes[0].set_ylabel("y")
-    axes[0].set_title("log_w_n")
+    axes[0].set_title(r"$\log{w_n}$")
     axes[0].grid(zorder=-20)
 
     axes[1].scatter(model.a[:, 0].cpu().detach().numpy(), model.a[:, 1].cpu().detach().numpy(), color=color)
     axes[1].set_xlabel("x")
     axes[1].set_ylabel("y")
-    axes[1].set_title("a_n")
+    axes[1].set_title(r"$a_n$")
     axes[1].grid(zorder=-20)
 
     axes[2].scatter(
@@ -31,7 +31,7 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Im
     )
     axes[2].set_xlabel("x")
     axes[2].set_ylabel("y")
-    axes[2].set_title("A_n")
+    axes[2].set_title(r"$A_n$")
     axes[2].grid(zorder=-20)
 
     if log:
@@ -55,7 +55,7 @@ def plot_B_parameters(
         axes[0].scatter(np.arange(model.m_potentials), log_v_m.cpu().detach().numpy(), label=label, color=color)
         axes[0].set_xlabel("M")
         axes[0].set_ylabel("value")
-        axes[0].set_title("log_v_m")
+        axes[0].set_title(r"$\log{v_m}$")
         axes[0].grid(zorder=-20)
 
         b_m = model.compute_b_m(point[None, :])
@@ -67,7 +67,7 @@ def plot_B_parameters(
         )
         axes[1].set_xlabel("x")
         axes[1].set_ylabel("y")
-        axes[1].set_title("b_m")
+        axes[1].set_title(r"$b_m$")
         axes[1].grid(zorder=-20)
 
         B_m = model.compute_B_m(point[None, :])
@@ -81,7 +81,7 @@ def plot_B_parameters(
         axes[2].set_ylabel("y (log. scale)")
         axes[2].set_xscale("log")
         axes[2].set_yscale("log")
-        axes[2].set_title("B_m")
+        axes[2].set_title(r"$B_m$")
         axes[2].grid(zorder=-20)
 
     for _, ax in enumerate(axes):
@@ -118,15 +118,16 @@ def plot_G_parameters(
         g_nm = model.compute_g_nm(b_nm, G_inv_nm)
 
         log_alpha_nm = model.compute_log_alpha_nm(log_v_m, B_m, G_nm, c_nm)
+        log_Z_nm = model.compute_log_Z_nm(log_alpha_nm, G_inv_nm, b_nm)
         axes[0].scatter(
             np.arange(model.m_potentials * model.n_potentials),
-            log_alpha_nm.view(model.m_potentials * model.n_potentials).cpu().detach().numpy(),
+            log_Z_nm.view(model.m_potentials * model.n_potentials).cpu().detach().numpy(),
             label=label,
             color=color,
         )
         axes[0].set_xlabel("N * M")
         axes[0].set_ylabel("value")
-        axes[0].set_title("log_alpha_mn")
+        axes[0].set_title(r"$\log{Z_{nm}}$")
         axes[0].grid(zorder=-20)
 
         axes[1].scatter(
@@ -137,7 +138,7 @@ def plot_G_parameters(
         )
         axes[1].set_xlabel("x")
         axes[1].set_ylabel("y")
-        axes[1].set_title("g_nm")
+        axes[1].set_title(r"$g_{nm}$")
         axes[1].grid(zorder=-20)
 
         scale = torch.sqrt(model.epsilon * G_inv_nm).view(model.n_potentials * model.m_potentials, model.y_dim)

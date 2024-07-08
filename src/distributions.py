@@ -58,7 +58,8 @@ class SwissRollSampler(Sampler):
         self.dim = 2
 
     def sample(self, batch_size=10):
-        batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
+        # batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
+        batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0][:, [0, 2]] / 7.5
         return torch.tensor(batch, device=self.device)
 
 
@@ -98,17 +99,6 @@ class StandardNormalOnCircleSampler(Sampler):
         mn = MultivariateNormal(loc=loc, covariance_matrix=covariance_matrix)
 
         return mn.sample()
-
-
-class SwissRollSampler(Sampler):
-    def __init__(self, dim=2, device="cuda"):
-        super(SwissRollSampler, self).__init__(device=device)
-        assert dim == 2
-        self.dim = 2
-
-    def sample(self, batch_size=10):
-        batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
-        return torch.tensor(batch, device=self.device)
 
 
 class Mix8GaussiansSampler(Sampler):
