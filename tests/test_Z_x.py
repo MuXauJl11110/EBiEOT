@@ -4,17 +4,17 @@ from src.light_gcot import LightGCOT
 
 
 def test_compute_log_alpha_nm(
-    batch_size: int, D: LightGCOT, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor
+    batch_size: int, D: LightGCOT, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor, A_n: torch.Tensor
 ):
-    G_nm, _ = D.compute_G_nm(B_m)  # [bs x N x M x y_dim]
-    c_nm = D.compute_c_nm(b_m, B_m)  # [bs x N x M]
+    G_nm, _ = D.compute_G_nm(B_m, A_n)  # [bs x N x M x y_dim]
+    c_nm = D.compute_c_nm(b_m, B_m, A_n)  # [bs x N x M]
     log_alpha_nm = D.compute_log_alpha_nm(log_v_m, B_m, G_nm, c_nm)  # [bs x N x M]
 
     _log_alpha_nm = torch.zeros((batch_size, D.n_potentials, D.m_potentials))
     for n in range(D.n_potentials):
         for m in range(D.m_potentials):
             _log_alpha_nm[:, n, m] = (
-                D.log_w[n]
+                D.log_w_n[n]
                 + log_v_m[:, m]
                 + 0.5
                 * (
@@ -27,10 +27,12 @@ def test_compute_log_alpha_nm(
     assert torch.allclose(log_alpha_nm, _log_alpha_nm)
 
 
-def test_compute_log_Z_nm(batch_size: int, D: LightGCOT, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor):
-    b_nm = D.compute_b_nm(b_m, B_m)  # [bs x N x M x y_dim]
-    G_nm, G_inv_nm = D.compute_G_nm(B_m)  # [bs x N x M x y_dim]
-    c_nm = D.compute_c_nm(b_m, B_m)  # [bs x N x M]
+def test_compute_log_Z_nm(
+    batch_size: int, D: LightGCOT, b_m: torch.Tensor, B_m: torch.Tensor, log_v_m: torch.Tensor, A_n: torch.Tensor
+):
+    b_nm = D.compute_b_nm(b_m, B_m, A_n)  # [bs x N x M x y_dim]
+    G_nm, G_inv_nm = D.compute_G_nm(B_m, A_n)  # [bs x N x M x y_dim]
+    c_nm = D.compute_c_nm(b_m, B_m, A_n)  # [bs x N x M]
     log_alpha_nm = D.compute_log_alpha_nm(log_v_m, B_m, G_nm, c_nm)  # [bs x N x M]
     log_Z_nm = D.compute_log_Z_nm(log_alpha_nm, G_inv_nm, b_nm)  # [bs]
 
@@ -38,7 +40,7 @@ def test_compute_log_Z_nm(batch_size: int, D: LightGCOT, b_m: torch.Tensor, B_m:
     for n in range(D.n_potentials):
         for m in range(D.m_potentials):
             _log_Z_nm[:, n, m] = (
-                D.log_w[n]
+                D.log_w_n[n]
                 + log_v_m[:, m]
                 + 0.5
                 * (
