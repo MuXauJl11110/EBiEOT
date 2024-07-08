@@ -124,7 +124,9 @@ class LightGCOT(nn.Module):
             return -self.epsilon * gmm.log_prob(batched_y)
 
     def compute_A_n(self, B_m: torch.Tensor) -> torch.Tensor:  # -> [1 x N x y_dim]
-        return self.A_n[None, :, :]
+        batch_size = B_m.shape[0]
+        self.A_n_matrix = self.A_n.repeat(batch_size, 1, 1)
+        return self.A_n_matrix
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M]
         batch_size = batched_x.shape[0]
