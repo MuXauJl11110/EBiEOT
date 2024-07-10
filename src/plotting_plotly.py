@@ -14,7 +14,7 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figur
     fig.add_trace(
         go.Scatter(
             x=np.arange(model.n_potentials),
-            y=model.log_w.cpu().detach().numpy(),
+            y=model.log_w_n.cpu().detach().numpy(),
             marker=dict(color="crimson"),
             mode="markers",
             customdata=np.arange(model.n_potentials),
@@ -24,8 +24,8 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figur
     )
     fig.add_trace(
         go.Scatter(
-            x=model.a[:, 0].cpu().detach().numpy(),
-            y=model.a[:, 1].cpu().detach().numpy(),
+            x=model.a_n[:, 0].cpu().detach().numpy(),
+            y=model.a_n[:, 1].cpu().detach().numpy(),
             marker=dict(color="crimson"),
             mode="markers",
             customdata=np.arange(model.n_potentials),

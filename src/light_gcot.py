@@ -95,7 +95,10 @@ class LightGCOT(nn.Module):
             self.b_m = torchvision.ops.MLP(
                 in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
             )
+            # init = Exponential(torch.ones(m_potentials, y_dim))  # torch.rand(m_potentials, y_dim))
+            # self.B_m = nn.Parameter(torch.exp(B_diagonal_init * init.sample()))
             self.B_m = nn.Parameter(B_diagonal_init * torch.ones(m_potentials, y_dim))
+            self.A_n = nn.Parameter(A_diagonal_init * torch.rand(n_potentials, y_dim) + A_diagonal_init)
 
     def init_a_by_samples(self, samples):
         assert samples.shape[0] == self.a_n.shape[0]
@@ -238,12 +241,22 @@ class LightGCOT(nn.Module):
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
+    # def compute_log_Z_nm(
+    #     self, log_alpha_nm: torch.Tensor, G_inv_nm: torch.Tensor, b_nm: torch.Tensor
+    # ) -> torch.Tensor:  # -> [bs x N x M]
+    #     if self.A_diagonal_init is not None and self.B_diagonal_init is not None:
+    #         return (
+    #             log_alpha_nm + 0.125 * torch.sum(b_nm * G_inv_nm * b_nm, dim=3) / self.epsilon
+    #         )  # [bs x N x M] + [bs x N x M] = [bs x N x M]
+    #     else:
+    #         raise NotImplementedError("Other options are not implemented yet!")
+
     def compute_log_Z_nm(
-        self, log_alpha_nm: torch.Tensor, G_inv_nm: torch.Tensor, b_nm: torch.Tensor
+        self, log_alpha_nm: torch.Tensor, G_nm: torch.Tensor, g_nm: torch.Tensor
     ) -> torch.Tensor:  # -> [bs x N x M]
         if self.A_diagonal_init is not None and self.B_diagonal_init is not None:
             return (
-                log_alpha_nm + 0.125 * torch.sum(b_nm * G_inv_nm * b_nm, dim=3) / self.epsilon
+                log_alpha_nm + 0.5 * torch.sum(g_nm * G_nm * g_nm, dim=3) / self.epsilon
             )  # [bs x N x M] + [bs x N x M] = [bs x N x M]
         else:
             raise NotImplementedError("Other options are not implemented yet!")
@@ -265,7 +278,9 @@ class LightGCOT(nn.Module):
         c_nm = self.compute_c_nm(b_m, B_m, A_n)
         b_nm = self.compute_b_nm(b_m, B_m, A_n)
         log_alpha_nm = self.compute_log_alpha_nm(log_v_m, B_m, G_nm, c_nm)
-        log_Z_nm = self.compute_log_Z_nm(log_alpha_nm, G_inv_nm, b_nm)
+        # log_Z_nm = self.compute_log_Z_nm(log_alpha_nm, G_inv_nm, b_nm)
+        g_nm = self.compute_g_nm(b_nm, G_inv_nm)
+        log_Z_nm = self.compute_log_Z_nm(log_alpha_nm, G_nm, g_nm)
         return -self.epsilon * torch.logsumexp(log_Z_nm, dim=(1, 2))  # [bs]
 
     def set_epsilon(self, new_epsilon):
@@ -299,7 +314,8 @@ class LightGCOT(nn.Module):
             g_nm = self.compute_g_nm(b_nm, G_inv_nm)  # [bs x N x M x y_dim]
 
             log_alpha_nm = self.compute_log_alpha_nm(log_v_m, B_m, G_nm, c_nm)  # [bs x N x M]
-            log_Z_nm = self.compute_log_Z_nm(log_alpha_nm, G_inv_nm, b_nm)  # [bs x N x M]
+            # log_Z_nm = self.compute_log_Z_nm(log_alpha_nm, G_inv_nm, b_nm)  # [bs x N x M]
+            log_Z_nm = self.compute_log_Z_nm(log_alpha_nm, G_nm, g_nm)  # [bs x N x M]
 
             loc = g_nm.view(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim)
             logits = log_Z_nm.view(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials)
