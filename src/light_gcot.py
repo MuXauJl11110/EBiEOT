@@ -42,7 +42,7 @@ class LightGCOT(nn.Module):
         self.log_w_n = nn.Parameter(torch.log(torch.ones(n_potentials) / n_potentials))
         self.a_n = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
-            self.A_n = nn.Parameter(A_diagonal_init * torch.ones(n_potentials, y_dim))  # [N x y_dim]
+            self.log_A_n = nn.Parameter(torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim)))  # [N x y_dim]
 
         self.known_costs = {
             "parameters",
@@ -86,6 +86,19 @@ class LightGCOT(nn.Module):
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
+    def compute_log_w_n(self):  # -> [N]
+        return self.log_w_n
+
+    def compute_a_n(self):  # -> [N x y_dim]
+        return self.a_n
+
+    def compute_A_n(self):  # -> [N x y_dim]
+        if self.A_diagonal_init is not None:
+            A_n = torch.exp(self.log_A_n)
+        else:
+            raise NotImplementedError("Other options are not implemented yet!")
+        return A_n
+
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M]
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
@@ -104,29 +117,35 @@ class LightGCOT(nn.Module):
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
-    def compute_log_Z_nm(self, log_v_m: torch.Tensor, b_m: torch.Tensor) -> torch.Tensor:  # -> [bs x N x M]
+    def compute_log_Z_nm(
+        self, log_w_n: torch.Tensor, a_n: torch.Tensor, A_n: torch.Tensor, log_v_m: torch.Tensor, b_m: torch.Tensor
+    ) -> torch.Tensor:  # -> [bs x N x M]
         if self.A_diagonal_init is not None:
             bT_A = (
-                b_m[:, None, :, :] * self.A_n[None, :, None, :]
+                b_m[:, None, :, :] * A_n[None, :, None, :]
             )  # [bs x 1 x M x y_dim] * [1 x N x 1 x y_dim] = [bs x N x M x y_dim]
             correction = torch.sum(
-                (bT_A + 2 * self.a_n[None, :, None, :]) * b_m[:, None, :, :], dim=3
+                (bT_A + 2 * a_n[None, :, None, :]) * b_m[:, None, :, :], dim=3
             )  # sum(([bs x N x M x y_dim] + [1 x N x 1 x y_dim]) * [bs x 1 x M x y_dim], dim=3) = [bs x N x M]
             return (
-                log_v_m[:, None, :] + self.log_w_n[None, :, None] + 0.5 * correction / self.epsilon
+                log_v_m[:, None, :] + log_w_n[None, :, None] + 0.5 * correction / self.epsilon
             )  # [bs x 1 x M] + [1 x N x 1] + [bs x N x M]
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
-    def compute_primal_potential(self, batched_y: torch.Tensor) -> torch.Tensor:  # -> [bs]
+    def compute_primal_potential(
+        self, batched_y: torch.Tensor, log_w_n: torch.Tensor, a_n: torch.Tensor, A_n: torch.Tensor
+    ) -> torch.Tensor:  # -> [bs]
         if self.A_diagonal_init is not None:
-            mix = Categorical(logits=self.log_w_n)
-            comp = Independent(Normal(loc=self.a_n, scale=torch.sqrt(self.epsilon * self.A_n)), 1)  # [N x y_dim]
+            mix = Categorical(logits=log_w_n)
+            comp = Independent(Normal(loc=a_n, scale=torch.sqrt(self.epsilon * A_n)), 1)  # [N x y_dim]
             gmm = MixtureSameFamily(mix, comp)
             return self.epsilon * gmm.log_prob(batched_y)  # [bs]
 
-    def compute_dual_potential(self, log_v_m: torch.Tensor, b_m: torch.Tensor) -> torch.Tensor:  # -> [bs]
-        log_Z_nm = self.compute_log_Z_nm(log_v_m, b_m)
+    def compute_dual_potential(
+        self, log_w_n: torch.Tensor, a_n: torch.Tensor, A_n: torch.Tensor, log_v_m: torch.Tensor, b_m: torch.Tensor
+    ) -> torch.Tensor:  # -> [bs]
+        log_Z_nm = self.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)
         return -self.epsilon * torch.logsumexp(log_Z_nm, dim=(1, 2))  # [bs]
 
     def set_epsilon(self, new_epsilon):
@@ -144,22 +163,25 @@ class LightGCOT(nn.Module):
             else (batch_size // sampling_batch_size) + 1
         )
 
+        log_w_n = self.compute_log_w_n()
+        a_n = self.compute_a_n()
+        A_n = self.compute_A_n()
         for i in range(num_sampling_iterations):
             sub_batch_x = batched_x[sampling_batch_size * i : sampling_batch_size * (i + 1)]
 
             b_m = self.compute_b_m(sub_batch_x)  # [bs x M x y_dim]
             log_v_m = self.compute_log_v_m(sub_batch_x)  # [bs x M]
 
-            log_Z_nm = self.compute_log_Z_nm(log_v_m, b_m)  # [bs x N x M]
+            log_Z_nm = self.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)  # [bs x N x M]
 
             logits = log_Z_nm.view(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials)
             if self.A_diagonal_init is not None:
                 scale = (
-                    torch.sqrt(self.epsilon * self.A_n)[None, :, None, :]
+                    torch.sqrt(self.epsilon * A_n)[None, :, None, :]
                     .repeat(min(sampling_batch_size, batch_size), 1, self.m_potentials, 1)
                     .view(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim)
                 )
-                loc = (self.a_n[None, :, None, :] + self.A_n[None, :, None, :] * b_m[:, None, :, :]).view(
+                loc = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).view(
                     min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim
                 )  # view([1 x N x 1 x y_dim] + [1 x N x 1 x y_dim] * [bs x 1 x M x y_dim] = [bs x N x M x y_dim]) = [bs x N * M]
                 mix = Categorical(logits=logits)

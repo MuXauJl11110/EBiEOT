@@ -12,21 +12,24 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Im
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
     color = cm.rainbow(np.linspace(0.1, 0.9, 1))
 
-    axes[0].scatter(np.arange(model.n_potentials), model.log_w_n.cpu().detach().numpy(), color=color)
+    log_w_n = model.compute_log_w_n()
+    a_n = model.compute_a_n()
+    A_n = model.compute_A_n()
+    axes[0].scatter(np.arange(model.n_potentials), log_w_n.cpu().detach().numpy(), color=color)
     axes[0].set_xlabel("N")
     axes[0].set_ylabel("value")
     axes[0].set_title(r"$\log{w_n}$")
     axes[0].grid(zorder=-20)
 
-    axes[1].scatter(model.a_n[:, 0].cpu().detach().numpy(), model.a_n[:, 1].cpu().detach().numpy(), color=color)
+    axes[1].scatter(a_n[:, 0].cpu().detach().numpy(), a_n[:, 1].cpu().detach().numpy(), color=color)
     axes[1].set_xlabel("x")
     axes[1].set_ylabel("y")
     axes[1].set_title(r"$a_n$")
     axes[1].grid(zorder=-20)
 
     axes[2].scatter(
-        model.A_n[:, 0].cpu().detach().numpy(),
-        model.A_n[:, 1].cpu().detach().numpy(),
+        A_n[:, 0].cpu().detach().numpy(),
+        A_n[:, 1].cpu().detach().numpy(),
         color=color,
     )
     axes[2].set_xlabel("x")
@@ -161,5 +164,4 @@ def plot_distributions(
         plt.close(fig)
         return distr_dict
     else:
-        plt.show()
         plt.show()
