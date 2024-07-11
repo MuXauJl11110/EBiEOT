@@ -7,6 +7,11 @@ from src.light_gcot import LightGCOT
 
 
 def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figure] | None:
+    # Compute data for plots
+    log_w_n = model.compute_log_w_n()
+    a_n = model.compute_a_n()
+    A_n = model.compute_A_n()
+
     # Initialize figure with subplots
     fig = make_subplots(rows=1, cols=3, subplot_titles=(r"$\log{w_n}$", r"$a_n$", r"$A_n$"))
 
@@ -14,7 +19,7 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figur
     fig.add_trace(
         go.Scatter(
             x=np.arange(model.n_potentials),
-            y=model.log_w_n.cpu().detach().numpy(),
+            y=log_w_n.cpu().detach().numpy(),
             marker=dict(color="crimson"),
             mode="markers",
             customdata=np.arange(model.n_potentials),
@@ -24,8 +29,8 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figur
     )
     fig.add_trace(
         go.Scatter(
-            x=model.a_n[:, 0].cpu().detach().numpy(),
-            y=model.a_n[:, 1].cpu().detach().numpy(),
+            x=a_n[:, 0].cpu().detach().numpy(),
+            y=a_n[:, 1].cpu().detach().numpy(),
             marker=dict(color="crimson"),
             mode="markers",
             customdata=np.arange(model.n_potentials),
@@ -35,8 +40,8 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figur
     )
     fig.add_trace(
         go.Scatter(
-            x=model.A_diagonal_matrix[:, 0].cpu().detach().numpy(),
-            y=model.A_diagonal_matrix[:, 1].cpu().detach().numpy(),
+            x=A_n[:, 0].cpu().detach().numpy(),
+            y=A_n[:, 1].cpu().detach().numpy(),
             marker=dict(color="crimson"),
             mode="markers",
             customdata=np.arange(model.n_potentials),
