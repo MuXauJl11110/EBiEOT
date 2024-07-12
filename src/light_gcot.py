@@ -39,10 +39,13 @@ class LightGCOT(nn.Module):
         self.register_buffer("epsilon", torch.tensor(epsilon))
         self.sampling_batch_size = sampling_batch_size
 
-        self.log_w_n = nn.Parameter(torch.log(torch.ones(n_potentials) / n_potentials))
+        self.log_w_n = nn.Parameter(self.epsilon * torch.log(torch.ones(n_potentials) / n_potentials))
+        print(y_dim)
         self.a_n = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
-            self.log_A_n = nn.Parameter(torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim)))  # [N x y_dim]
+            self.log_A_n = nn.Parameter(
+                torch.log(A_diagonal_init * torch.rand(n_potentials, y_dim) + 0.1)
+            )  # [N x y_dim]
 
         self.known_costs = {
             "parameters",
@@ -87,7 +90,7 @@ class LightGCOT(nn.Module):
             raise NotImplementedError("Other options are not implemented yet!")
 
     def compute_log_w_n(self):  # -> [N]
-        return self.log_w_n
+        return self.log_w_n / self.epsilon
 
     def compute_a_n(self):  # -> [N x y_dim]
         return self.a_n

@@ -191,3 +191,37 @@ class StandartNormalSampler(Sampler):
         return torch.randn(
             batch_size, self.dim, dtype=self.dtype, device=self.device, requires_grad=self.requires_grad
         )
+
+
+class GridGaussiansSampler(Sampler):
+    def __init__(
+        self,
+        dim: int = 2,
+        x_mode: int = 2,
+        y_mode: int = 2,
+        x_from: float = -2.0,
+        x_to: float = 2.0,
+        y_from: float = -2.0,
+        y_to: float = 2.0,
+        std: float = 0.15,
+        shuffle: bool = True,
+        device: str = "cuda",
+    ):
+        super(GridGaussiansSampler, self).__init__(device=device)
+        self.dim = dim
+        self.std = std
+
+        assert x_from < x_to
+        assert y_from < y_to
+        mu_x = torch.from_numpy(np.linspace(x_from, x_to, x_mode))
+        mu_y = torch.from_numpy(np.linspace(y_from, y_to, y_mode))
+        self.mu = torch.cartesian_prod(mu_x, mu_y).to(device=device)
+        if shuffle:
+            perm = torch.randperm(x_mode * y_mode)
+            self.mu = self.mu[perm, :]
+        self.cov = torch.diag(std * torch.ones(x_mode * y_mode, device=device))
+        self.distribution = MultivariateNormal(loc=self.mu.T, scale_tril=self.cov)
+
+    def sample(self, batch_size: int = 10):
+        # return self.distribution.sample((batch_size,)).swapaxes(0, 1).flatten(1).T
+        return self.distribution.sample((batch_size,)).swapaxes(1, 2).reshape(batch_size * len(self.mu), self.dim)

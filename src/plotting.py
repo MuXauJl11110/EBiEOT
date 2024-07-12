@@ -4,7 +4,7 @@ import torch
 from matplotlib import pyplot as plt
 
 import wandb
-from src.distributions import Sampler
+from src.distributions import GridGaussiansSampler, Sampler
 from src.light_gcot import LightGCOT
 
 
@@ -51,10 +51,10 @@ def plot_B_parameters(
 ) -> dict[str, wandb.Image] | None:
     fig, axes = plt.subplots(1, 2, figsize=(10, 5), dpi=200)
 
-    colors_chosen = cm.rainbow(np.linspace(0.1, 0.9, len(starting_points)))
+    colors = cm.rainbow(np.linspace(0.1, 0.9, len(starting_points)))
     log_v_m = model.compute_log_v_m(starting_points)
     b_m = model.compute_b_m(starting_points)
-    for i, (color, point) in enumerate(zip(colors_chosen, starting_points)):
+    for i, (color, point) in enumerate(zip(colors, starting_points)):
         label = f"{point.cpu().numpy()}"
 
         axes[0].scatter(np.arange(model.m_potentials), log_v_m[i].cpu().detach().numpy(), label=label, color=color)
@@ -86,6 +86,67 @@ def plot_B_parameters(
         plt.show()
 
 
+def plot_gaussians(
+    model: LightGCOT,
+    X_sampler: GridGaussiansSampler,
+    Y_sampler: GridGaussiansSampler,
+    num_samples: int = 256,
+    log: bool = False,
+) -> dict[str, wandb.Image] | None:
+    num_gaussians = len(X_sampler.mu)
+    colors = cm.rainbow(np.linspace(0, 1, num_gaussians))
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
+
+    for ax in axes:
+        ax.grid(zorder=-20)
+
+    x_samples = X_sampler.sample(num_samples)
+    y_samples = Y_sampler.sample(num_samples)
+
+    y_pred = model(x_samples).cpu().numpy()
+    for i in range(num_gaussians):
+        indices = np.arange(i, len(x_samples), num_gaussians)
+        # First plot
+        axes[0].scatter(
+            x_samples[indices, 0].cpu().numpy(),
+            x_samples[indices, 1].cpu().numpy(),
+            alpha=0.3,
+            color=colors[i],
+            s=32,
+            edgecolors="black",
+        )
+        # Second plot
+        axes[1].scatter(
+            y_samples[indices, 0].cpu().numpy(),
+            y_samples[indices, 1].cpu().numpy(),
+            alpha=0.3,
+            color=colors[i],
+            s=32,
+            edgecolors="black",
+        )
+        # Third plot
+        axes[2].scatter(
+            y_pred[indices, 0],
+            y_pred[indices, 1],
+            alpha=0.3,
+            color=colors[i],
+            s=32,
+            edgecolors="black",
+        )
+    axes[0].set_title(label=r"Input distirubtion $p_0$")
+    axes[1].set_title(label=r"Target distribution $p_1$")
+    axes[2].set_title(label=r"Fitted distribution")
+
+    fig.tight_layout(pad=0.1)
+
+    if log:
+        distr_dict = {"Distribution": wandb.Image(fig)}
+        plt.close(fig)
+        return distr_dict
+    else:
+        plt.show()
+
+
 def plot_distributions(
     model: LightGCOT,
     X_sampler: Sampler,
@@ -95,7 +156,7 @@ def plot_distributions(
     num_samples: int = 1024,
     log: bool = False,
 ) -> dict[str, wandb.Image] | None:
-    colors_chosen = cm.rainbow(np.linspace(0.1, 0.9, len(starting_points)))
+    colors = cm.rainbow(np.linspace(0.1, 0.9, len(starting_points)))
     fig, axes = plt.subplots(1, 2, figsize=(10, 5), dpi=200)
 
     for ax in axes:
@@ -129,7 +190,7 @@ def plot_distributions(
         y_pred[:, 0], y_pred[:, 1], c="yellow", s=32, edgecolors="black", label="Fitted distribution", zorder=1
     )
 
-    for color, point in zip(colors_chosen, starting_points):
+    for color, point in zip(colors, starting_points):
         label = f"{point.cpu().numpy()}"
         repeated_starting_points = point[None, :].repeat(num_ending_points, 1)
         point_pred = model(repeated_starting_points).cpu().numpy()
