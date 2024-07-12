@@ -1,0 +1,6 @@
+X:
+  _target_: src.distributions.StandardNormalSampler
+  dim: 2
+Y:
+  _target_: src.distributions.SwissRollSampler
+  dim: 2

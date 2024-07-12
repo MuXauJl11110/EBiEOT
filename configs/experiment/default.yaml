@@ -1,0 +1,10 @@
+init_by_samples: False
+cost_included: True
+mini_batch: False
+meta_info: "_"
+gradient_max_norm: 1e10
+train:
+  begin: -1
+  end: 20000
+  plot_every: 500
+  batch_size: 128
