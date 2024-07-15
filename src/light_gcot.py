@@ -40,17 +40,13 @@ class LightGCOT(nn.Module):
         self.sampling_batch_size = sampling_batch_size
 
         self.log_w_n = nn.Parameter(self.epsilon * torch.log(torch.ones(n_potentials) / n_potentials))
-        print(y_dim)
         self.a_n = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
             self.log_A_n = nn.Parameter(
                 torch.log(A_diagonal_init * torch.rand(n_potentials, y_dim) + 0.1)
             )  # [N x y_dim]
 
-        self.known_costs = {
-            "parameters",
-            "MLP",
-        }
+        self.known_costs = {"parameters", "MLP", "MLP_deep"}
         self.cost_function = cost_function
         if self.cost_function not in self.known_costs:
             raise NotImplementedError(f"Cost function: {self.cost_function} not implemented yet!")
@@ -66,6 +62,14 @@ class LightGCOT(nn.Module):
             )
             self.b_m = torchvision.ops.MLP(
                 in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
+            )
+        elif self.cost_function == "MLP_deep":
+            self.log_v_m = nn.Sequential(
+                torchvision.ops.MLP(in_channels=x_dim, hidden_channels=[m_potentials], activation_layer=torch.nn.ReLU),
+                nn.LogSoftmax(dim=-1),
+            )
+            self.b_m = torchvision.ops.MLP(
+                in_channels=x_dim, hidden_channels=[m_potentials, m_potentials * y_dim], activation_layer=torch.nn.ReLU
             )
 
     def init_a_by_samples(self, samples):
@@ -106,7 +110,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
             return self.log_v_m.repeat(batch_size, 1)
-        elif self.cost_function == "MLP":
+        elif self.cost_function in {"MLP", "MLP_deep"}:
             return self.log_v_m(batched_x)
         else:
             raise NotImplementedError("Other options are not implemented yet!")
@@ -115,7 +119,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
             return self.b_m.repeat(batch_size, 1, 1)
-        elif self.cost_function == "MLP":
+        elif self.cost_function in {"MLP", "MLP_deep"}:
             return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
         else:
             raise NotImplementedError("Other options are not implemented yet!")

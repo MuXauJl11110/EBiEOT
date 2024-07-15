@@ -1,7 +1,7 @@
 defaults:
   - _self_
-  - model: swiss_roll
-  - samplers: swiss_roll
+  - model: grid_gaussians
+  - samplers: grid_gaussians
   - optimizer: adam
   - experiment: default
   - plan_sampler: ot
@@ -10,7 +10,7 @@ seed: 30
 device: auto # Auto-discover accelerator e.g. cuda
 double_precision: True
 project: Light-GCOT
-name: Swiss_Roll
+name: Grid_Gaussians
 
 hydra:
   # Logging configuration: https://hydra.cc/docs/tutorials/basic/running_your_app/logging/

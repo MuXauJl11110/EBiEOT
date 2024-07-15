@@ -74,7 +74,7 @@ def setup_wandb_config(cfg: DictConfig) -> tuple[str, dict, str]:
     return exp_name, exp_config, output_path
 
 
-@hydra.main(config_path="./configs", config_name="main", version_base=None)
+@hydra.main(config_path="./configs", config_name="main", version_base="1.3")
 def main(cfg: DictConfig):
     device = setup_accelerator(cfg)
     exp_name, exp_config, output_path = setup_wandb_config(cfg)

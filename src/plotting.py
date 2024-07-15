@@ -36,7 +36,6 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Im
     axes[2].set_ylabel("y")
     axes[2].set_title(r"$A_n$")
     axes[2].grid(zorder=-20)
-    axes[2].legend(loc="lower right")
 
     if log:
         A_dict = {"A parameters": wandb.Image(fig)}
@@ -133,7 +132,7 @@ def plot_gaussians(
             s=32,
             edgecolors="black",
         )
-    axes[0].set_title(label=r"Input distirubtion $p_0$")
+    axes[0].set_title(label=r"Input distribution $p_0$")
     axes[1].set_title(label=r"Target distribution $p_1$")
     axes[2].set_title(label=r"Fitted distribution")
 
