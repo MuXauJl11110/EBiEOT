@@ -1,3 +1,4 @@
+import geotorch
 import torch
 import torchvision
 from torch import nn
@@ -43,10 +44,14 @@ class LightGCOT(nn.Module):
         self.a_n = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
             self.log_A_n = nn.Parameter(
-                torch.log(A_diagonal_init * torch.rand(n_potentials, y_dim) + 0.1)
+                torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim))
+                # torch.log(A_diagonal_init * torch.rand(n_potentials, y_dim) + 0.1)
             )  # [N x y_dim]
+        else:
+            self.A_n = nn.Parameter(torch.randn(n_potentials, self.dim, self.dim))
+            geotorch.orthogonal(self, "S_rotation_matrix")
 
-        self.known_costs = {"parameters", "MLP", "MLP_deep"}
+        self.known_costs = {"parameters", "MLP", "MLP_deep", "MLP_deep_deep"}
         self.cost_function = cost_function
         if self.cost_function not in self.known_costs:
             raise NotImplementedError(f"Cost function: {self.cost_function} not implemented yet!")
@@ -70,6 +75,20 @@ class LightGCOT(nn.Module):
             )
             self.b_m = torchvision.ops.MLP(
                 in_channels=x_dim, hidden_channels=[m_potentials, m_potentials * y_dim], activation_layer=torch.nn.ReLU
+            )
+        elif self.cost_function == "MLP_deep_deep":
+            self.log_v_m = nn.Sequential(
+                torchvision.ops.MLP(
+                    in_channels=x_dim,
+                    hidden_channels=[m_potentials // 2, m_potentials],
+                    activation_layer=torch.nn.ReLU,
+                ),
+                nn.LogSoftmax(dim=-1),
+            )
+            self.b_m = torchvision.ops.MLP(
+                in_channels=x_dim,
+                hidden_channels=[m_potentials, m_potentials * y_dim],
+                activation_layer=torch.nn.ReLU,
             )
 
     def init_a_by_samples(self, samples):
@@ -110,7 +129,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
             return self.log_v_m.repeat(batch_size, 1)
-        elif self.cost_function in {"MLP", "MLP_deep"}:
+        elif self.cost_function in {"MLP", "MLP_deep", "MLP_deep_deep"}:
             return self.log_v_m(batched_x)
         else:
             raise NotImplementedError("Other options are not implemented yet!")
@@ -119,7 +138,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
             return self.b_m.repeat(batch_size, 1, 1)
-        elif self.cost_function in {"MLP", "MLP_deep"}:
+        elif self.cost_function in {"MLP", "MLP_deep", "MLP_deep_deep"}:
             return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
         else:
             raise NotImplementedError("Other options are not implemented yet!")

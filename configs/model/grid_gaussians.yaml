@@ -1,9 +1,9 @@
 _target_: src.light_gcot.LightGCOT
 x_dim: ${samplers.X.dim}
 y_dim: ${samplers.Y.dim}
-n_potentials: 4
-m_potentials: 4
+n_potentials: 25
+m_potentials: 25
 epsilon: 0.002
 sampling_batch_size: 128
-A_diagonal_init: 0.1
-cost_function: MLP_deep
+A_diagonal_init: 0.07
+cost_function: MLP_deep_deep

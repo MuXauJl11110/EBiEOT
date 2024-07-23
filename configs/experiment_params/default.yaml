@@ -1,0 +1,7 @@
+project_name: Light-GCOT
+seed: 42
+device: auto # Auto-discover accelerator e.g. cuda
+double_precision: True
+init_by_samples: False
+cost_included: True
+gradient_max_norm: 1e10

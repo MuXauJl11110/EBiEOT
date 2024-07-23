@@ -89,12 +89,14 @@ def plot_gaussians(
     model: LightGCOT,
     X_sampler: GridGaussiansSampler,
     Y_sampler: GridGaussiansSampler,
+    X_paired: torch.Tensor,
+    Y_paired: torch.Tensor,
     num_samples: int = 256,
     log: bool = False,
 ) -> dict[str, wandb.Image] | None:
     num_gaussians = len(X_sampler.mu)
     colors = cm.rainbow(np.linspace(0, 1, num_gaussians))
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5), dpi=200)
 
     for ax in axes:
         ax.grid(zorder=-20)
@@ -136,6 +138,13 @@ def plot_gaussians(
     axes[1].set_title(label=r"Target distribution $p_1$")
     axes[2].set_title(label=r"Fitted distribution")
 
+    pair_colors = cm.rainbow(np.linspace(0, 1, len(X_paired)))
+    for color, x, y in zip(pair_colors, X_paired.cpu().numpy(), Y_paired.cpu().numpy()):
+        axes[3].scatter(x[0], x[1], color=color, s=32, edgecolors="black")
+        axes[3].scatter(y[0], y[1], color=color, s=32, edgecolors="black")
+        axes[3].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color=color)
+    axes[3].set_title(label=r"Pairs")
+
     fig.tight_layout(pad=0.1)
 
     if log:
@@ -150,13 +159,15 @@ def plot_distributions(
     model: LightGCOT,
     X_sampler: Sampler,
     Y_sampler: Sampler,
+    X_paired: torch.Tensor,
+    Y_paired: torch.Tensor,
     starting_points: torch.Tensor,
     num_ending_points: int = 256,
     num_samples: int = 1024,
     log: bool = False,
 ) -> dict[str, wandb.Image] | None:
     colors = cm.rainbow(np.linspace(0.1, 0.9, len(starting_points)))
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5), dpi=200)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
 
     for ax in axes:
         ax.grid(zorder=-20)
@@ -211,6 +222,12 @@ def plot_distributions(
             zorder=3,
             edgecolors="black",
         )
+
+    pair_colors = cm.rainbow(np.linspace(0, 1, len(X_paired)))
+    for color, x, y in zip(pair_colors, X_paired.cpu().numpy(), Y_paired.cpu().numpy()):
+        axes[2].scatter(x[0], x[1], color=color, s=32, edgecolors="black")
+        axes[2].scatter(y[0], y[1], color=color, s=32, edgecolors="black")
+        axes[2].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color=color)
 
     for _, ax in enumerate(axes):
         ax.set_xlim([-3.5, 3.5])
