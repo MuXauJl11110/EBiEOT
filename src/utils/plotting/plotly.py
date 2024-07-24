@@ -3,7 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from src.light_gcot import LightGCOT
+from src.models.light_gcot import LightGCOT
 
 
 def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figure] | None:

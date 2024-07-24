@@ -4,8 +4,8 @@ import torch
 from matplotlib import pyplot as plt
 
 import wandb
-from src.distributions import GridGaussiansSampler, Sampler
-from src.light_gcot import LightGCOT
+from src.models.light_gcot import LightGCOT
+from src.samplers.primary import GridGaussiansSampler, Sampler
 
 
 def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Image] | None:
