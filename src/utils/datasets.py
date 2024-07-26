@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import TensorDataset
 
 from src.samplers.guided import (
     PairedSubsetSampler,
@@ -27,15 +27,11 @@ def get_Splatter_dataset(dataset_path: str = "../datasets/Splatter/") -> dict[st
     return data_set
 
 
-def get_Splatter_loaders_and_samplers(
+def get_Splatter_data(
     data_set: dict[str, np.ndarray],
-    batch_size: int,
-    num_labeled: int,
-    train_subset_size: int,
     source_name: str = "TM_baron_mouse_for_segerstolpe",
     target_name: str = "segerstolpe_human",
-    loader_kwargs: dict[str, tp.Any] = {},
-) -> tuple[DataLoader, DataLoader, DataLoader, PairedSubsetSampler, PairedSubsetSampler]:
+) -> tuple[TensorDataset, TensorDataset]:
     """
     :param dict[str, np.ndarray] data_set: Dataset.
     :param str source_name: Source name "TM_baron_mouse_for_segerstolpe" or "segerstolpe_human", defaults to "TM_baron_mouse_for_segerstolpe"
@@ -84,14 +80,17 @@ def get_Splatter_loaders_and_samplers(
     source_data = TensorDataset(
         torch.FloatTensor(source_set_filtered["features"]), torch.LongTensor(source_set_filtered["labels"])
     )
-    source_loader = DataLoader(source_data, batch_size=batch_size, shuffle=True, drop_last=True, **loader_kwargs)
-
     target_data = TensorDataset(torch.FloatTensor(target_set["features"]), torch.LongTensor(target_set["labels"]))
-    target_loader = DataLoader(target_data, batch_size=batch_size, shuffle=True, drop_last=True, **loader_kwargs)
-    target_test_loader = DataLoader(
-        target_data, batch_size=batch_size, shuffle=False, drop_last=False, **loader_kwargs
-    )
 
+    return source_data, source_labels, target_data, source_labels  # target_labels = source_labels
+
+
+def get_Splatter_samplers(
+    batch_size: int,
+    num_labeled: int,
+    train_subset_size: int,
+    loader_kwargs: dict[str, tp.Any] = {},
+):
     source_subset_samples, source_subset_labels, source_class_indicies = get_indicies_subset(
         source_data, subset_classes=np.arange(len(source_labels)), new_labels=source_labels
     )
