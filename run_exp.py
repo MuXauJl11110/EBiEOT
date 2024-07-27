@@ -4,12 +4,12 @@ import os
 import hydra
 import numpy as np
 import torch
+import wandb
 from omegaconf import DictConfig
 from torch import optim
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-import wandb
 from src.discrete_ot import OTPlanSampler
 from src.distributions import PairedSampler, Sampler
 from src.light_gcot import LightGCOT

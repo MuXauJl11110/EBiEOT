@@ -1,4 +1,3 @@
-import typing as tp
 from pathlib import Path
 
 import numpy as np
@@ -31,7 +30,7 @@ def get_Splatter_data(
     data_set: dict[str, np.ndarray],
     source_name: str = "TM_baron_mouse_for_segerstolpe",
     target_name: str = "segerstolpe_human",
-) -> tuple[TensorDataset, TensorDataset]:
+) -> tuple[TensorDataset, np.ndarray, TensorDataset, np.ndarray]:
     """
     :param dict[str, np.ndarray] data_set: Dataset.
     :param str source_name: Source name "TM_baron_mouse_for_segerstolpe" or "segerstolpe_human", defaults to "TM_baron_mouse_for_segerstolpe"
@@ -82,23 +81,25 @@ def get_Splatter_data(
     )
     target_data = TensorDataset(torch.FloatTensor(target_set["features"]), torch.LongTensor(target_set["labels"]))
 
-    return source_data, source_labels, target_data, source_labels  # target_labels = source_labels
+    return source_data, source_labels, target_data, source_labels  # target_labels := source_labels
 
 
 def get_Splatter_samplers(
-    batch_size: int,
+    source_data: TensorDataset,
+    source_labels: np.ndarray,
+    target_data: TensorDataset,
+    target_labels: np.ndarray,
     num_labeled: int,
     train_subset_size: int,
-    loader_kwargs: dict[str, tp.Any] = {},
-):
+    device: str = "cuda",
+) -> tuple[PairedSubsetSampler, PairedSubsetSampler]:
     source_subset_samples, source_subset_labels, source_class_indicies = get_indicies_subset(
         source_data, subset_classes=np.arange(len(source_labels)), new_labels=source_labels
     )
     source_train = TensorDataset(torch.stack(source_subset_samples), torch.LongTensor(source_subset_labels))
 
-    new_target_labels = source_labels
     target_subset_samples, target_subset_labels, target_class_indicies = get_indicies_subset(
-        target_data, subset_classes=np.arange(len(new_target_labels)), new_labels=new_target_labels
+        target_data, subset_classes=np.arange(len(target_labels)), new_labels=target_labels
     )
     target_train = TensorDataset(torch.stack(target_subset_samples), torch.LongTensor(target_subset_labels))
 
@@ -117,6 +118,7 @@ def get_Splatter_samplers(
         in_indicies=source_class_indicies,
         out_indicies=target_class_indicies,
     )
-    train_XY_sampler = PairedSubsetSampler(train_set, subset_size=train_subset_size)
-    full_XY_sampler = PairedSubsetSampler(full_set, subset_size=1)
-    return source_loader, target_loader, target_test_loader, train_XY_sampler, full_XY_sampler
+    train_XY_sampler = PairedSubsetSampler(train_set, subset_size=train_subset_size, device=device)
+    full_XY_sampler = PairedSubsetSampler(full_set, subset_size=1, device=device)
+
+    return train_XY_sampler, full_XY_sampler
