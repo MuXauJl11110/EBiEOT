@@ -13,8 +13,8 @@ class SwissRollSampler(Sampler):
         self.dim = 2
 
     def sample(self, batch_size: int = 10):
-        # batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
-        batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0][:, [0, 2]] / 7.5
+        batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
+        # batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0][:, [0, 2]] / 7.5
         return torch.tensor(batch, device=self.device)
 
 
@@ -77,8 +77,8 @@ class GridGaussiansSampler(Sampler):
 
         assert x_from < x_to
         assert y_from < y_to
-        mu_x = torch.from_numpy(np.linspace(x_from, x_to, x_mode))
-        mu_y = torch.from_numpy(np.linspace(y_from, y_to, y_mode))
+        mu_x = torch.from_numpy(np.linspace(x_from, x_to, x_mode, dtype=np.float32))
+        mu_y = torch.from_numpy(np.linspace(y_from, y_to, y_mode, dtype=np.float32))
         self.mu = torch.cartesian_prod(mu_x, mu_y).to(device=device)
         if shuffle:
             perm = torch.randperm(x_mode * y_mode)
@@ -87,5 +87,4 @@ class GridGaussiansSampler(Sampler):
         self.distribution = MultivariateNormal(loc=self.mu.T, scale_tril=self.cov)
 
     def sample(self, batch_size: int = 10):
-        # return self.distribution.sample((batch_size,)).swapaxes(0, 1).flatten(1).T
         return self.distribution.sample((batch_size,)).swapaxes(1, 2).reshape(batch_size * len(self.mu), self.dim)

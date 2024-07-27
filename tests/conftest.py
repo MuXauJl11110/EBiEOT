@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from src.light_gcot import LightGCOT
+from src.models.light_gcot import LightGCOT
 
 x_dim_list = [5]
 y_dim_list = [5]

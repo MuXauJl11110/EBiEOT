@@ -230,7 +230,7 @@ def plot_distributions(
         axes[2].scatter(y[0], y[1], color=color, s=32, edgecolors="black")
         axes[2].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color=color)
 
-    for _, ax in enumerate(axes):
+    for _, ax in enumerate(axes[:2]):
         ax.set_xlim([-3.5, 3.5])
         ax.set_ylim([-3.5, 3.5])
         ax.legend(loc="lower right")
@@ -298,7 +298,6 @@ def plot_PCA(
             source_point[1],
             target_point[0] - source_point[0],
             target_point[1] - source_point[1],
-            # linestyle="--",
             edgecolor="g",
         )
         axes[2].arrow(
