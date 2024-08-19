@@ -158,8 +158,10 @@ def plot_gaussians(
 
 def plot_distributions(
     model: LightGCOT,
-    X_sampler: Sampler,
-    Y_sampler: Sampler,
+    x_samples: torch.Tensor,
+    y_samples: torch.Tensor,
+    # X_sampler: Sampler,
+    # Y_sampler: Sampler,
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
     starting_points: torch.Tensor,
@@ -173,8 +175,8 @@ def plot_distributions(
     for ax in axes:
         ax.grid(zorder=-20)
 
-    x_samples = X_sampler.sample(num_samples)
-    y_samples = Y_sampler.sample(num_samples)
+    # x_samples = X_sampler.sample(num_samples)
+    # y_samples = Y_sampler.sample(num_samples)
 
     # First plot
     axes[0].scatter(
@@ -224,13 +226,35 @@ def plot_distributions(
             edgecolors="black",
         )
 
-    pair_colors = cm.rainbow(np.linspace(0, 1, len(X_paired)))
-    for color, x, y in zip(pair_colors, X_paired.cpu().numpy(), Y_paired.cpu().numpy()):
-        axes[2].scatter(x[0], x[1], color=color, s=32, edgecolors="black")
-        axes[2].scatter(y[0], y[1], color=color, s=32, edgecolors="black")
-        axes[2].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color=color)
+    # Third plot
+    # pair_colors = cm.rainbow(np.linspace(0, 1, len(X_paired)))
+    # for color, x, y in zip(pair_colors, X_paired.cpu().numpy(), Y_paired.cpu().numpy()):
+    #     axes[2].scatter(x[0], x[1], color=color, s=32, edgecolors="black")
+    #     axes[2].scatter(y[0], y[1], color=color, s=32, edgecolors="black")
+    #     axes[2].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color=color)
 
-    for _, ax in enumerate(axes[:2]):
+    axes[2].scatter(
+        X_paired[:, 0].cpu().numpy(),
+        X_paired[:, 1].cpu().numpy(),
+        alpha=0.3,
+        c="g",
+        s=32,
+        edgecolors="black",
+        label=r"Input paired samples from distribution $p_0$",
+    )
+    axes[2].scatter(
+        Y_paired[:, 0].cpu().numpy(),
+        Y_paired[:, 1].cpu().numpy(),
+        c="orange",
+        s=32,
+        edgecolors="black",
+        label=r"Target paired samples from distribution $p_1$",
+    )
+
+    for x, y in zip(X_paired.cpu().numpy(), Y_paired.cpu().numpy()):
+        axes[2].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color="black")
+
+    for _, ax in enumerate(axes):
         ax.set_xlim([-3.5, 3.5])
         ax.set_ylim([-3.5, 3.5])
         ax.legend(loc="lower right")

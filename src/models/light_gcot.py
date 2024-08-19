@@ -43,13 +43,7 @@ class LightGCOT(nn.Module):
         self.log_w_n = nn.Parameter(self.epsilon * torch.log(torch.ones(n_potentials) / n_potentials))
         self.a_n = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
-            self.log_A_n = nn.Parameter(
-                torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim))
-                # torch.log(A_diagonal_init * torch.rand(n_potentials, y_dim) + 0.1)
-            )  # [N x y_dim]
-        else:
-            self.A_n = nn.Parameter(torch.randn(n_potentials, self.dim, self.dim))
-            geotorch.orthogonal(self, "S_rotation_matrix")
+            self.log_A_n = nn.Parameter(torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim)))  # [N x y_dim]
 
         self.known_costs = {"parameters", "MLP", "MLP_deep", "MLP_deep_deep"}
         self.cost_function = cost_function
@@ -91,7 +85,7 @@ class LightGCOT(nn.Module):
                 activation_layer=torch.nn.ReLU,
             )
 
-    def init_a_by_samples(self, samples):
+    def init_a_by_samples(self, samples: torch.Tensor):
         assert samples.shape[0] == self.a_n.shape[0]
 
         self.a_n.data = torch.clone(samples.to(self.a_n.device))
