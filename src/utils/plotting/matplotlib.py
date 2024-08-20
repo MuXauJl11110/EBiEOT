@@ -1,10 +1,10 @@
 import matplotlib.cm as cm
 import numpy as np
 import torch
-import wandb
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 
+import wandb
 from src.models.light_gcot import LightGCOT
 from src.samplers.primary import GridGaussiansSampler, Sampler
 
@@ -158,10 +158,10 @@ def plot_gaussians(
 
 def plot_distributions(
     model: LightGCOT,
-    x_samples: torch.Tensor,
-    y_samples: torch.Tensor,
-    # X_sampler: Sampler,
-    # Y_sampler: Sampler,
+    # x_samples: torch.Tensor,
+    # y_samples: torch.Tensor,
+    X_sampler: Sampler,
+    Y_sampler: Sampler,
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
     starting_points: torch.Tensor,
@@ -175,8 +175,8 @@ def plot_distributions(
     for ax in axes:
         ax.grid(zorder=-20)
 
-    # x_samples = X_sampler.sample(num_samples)
-    # y_samples = Y_sampler.sample(num_samples)
+    x_samples = X_sampler.sample(num_samples)
+    y_samples = Y_sampler.sample(num_samples)
 
     # First plot
     axes[0].scatter(
