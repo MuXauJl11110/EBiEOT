@@ -72,8 +72,16 @@ class OTPlanSampler:
             x0 = x0.reshape(x0.shape[0], -1)
         if x1.dim() > 2:
             x1 = x1.reshape(x1.shape[0], -1)
-        x1 = x1.reshape(x1.shape[0], -1)
-        M = torch.cdist(x0, -x1) ** 2
+        # M = torch.cdist(x0, -x1) ** 2
+        rotation_angle = torch.tensor(torch.pi / 2)
+        rotation_matrix = torch.tensor(
+            [
+                [torch.cos(rotation_angle), -torch.sin(rotation_angle)],
+                [torch.sin(rotation_angle), torch.cos(rotation_angle)],
+            ]
+        )
+        # M = torch.cdist(x0 @ rotation_matrix, -x1 @ rotation_matrix) ** 2
+        M = torch.cdist(x0, -x1 @ rotation_matrix) ** 2
         if self.normalize_cost:
             M = M / M.max()  # should not be normalized when using minibatches
         p = self.ot_fn(a, b, M.detach().cpu().numpy())

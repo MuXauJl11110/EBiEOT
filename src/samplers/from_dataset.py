@@ -19,7 +19,7 @@ class DatasetSampler(Sampler):
     def sample(self, batch_size: int = 16):
         ind = random.choices(range(len(self.dataset)), k=batch_size)
         with torch.no_grad():
-            batch = self.dataset[ind].clone().to(self.device).float()
+            batch = self.dataset[ind].clone().to(self.device)  # .float()
         return batch
 
 

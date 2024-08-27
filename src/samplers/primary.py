@@ -7,14 +7,17 @@ from src.samplers.base import Sampler
 
 
 class SwissRollSampler(Sampler):
-    def __init__(self, dim: int = 2, device: str = "cuda"):
+    def __init__(self, dim: int = 2, device: str = "cuda", dtype: torch.dtype = torch.float32):
         super(SwissRollSampler, self).__init__(device=device)
         assert dim == 2
         self.dim = 2
+        self.dtype = dtype
 
     def sample(self, batch_size: int = 10):
-        batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
-        # batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0][:, [0, 2]] / 7.5
+        if self.dtype == torch.float32:
+            batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
+        else:
+            batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0][:, [0, 2]] / 7.5
         return torch.tensor(batch, device=self.device)
 
 
@@ -30,8 +33,8 @@ class StandardNormalSampler(Sampler):
 class StandardNormalOnCircleSampler(Sampler):
     def __init__(self, R: float, D: torch.Tensor, device: str = "cuda"):
         super(StandardNormalOnCircleSampler, self).__init__(device=device)
-        self.R = R
-        self.D = D
+        self.R = R  # radius
+        self.D = D  # rotation matrix
         self.dim = 2
 
     def compute(self, t: torch.Tensor, diag: bool = False) -> tuple[torch.Tensor, torch.Tensor]:

@@ -1,4 +1,3 @@
-import geotorch
 import torch
 import torchvision
 from torch import nn
@@ -45,7 +44,7 @@ class LightGCOT(nn.Module):
         if A_diagonal_init is not None:
             self.log_A_n = nn.Parameter(torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim)))  # [N x y_dim]
 
-        self.known_costs = {"parameters", "MLP", "MLP_deep", "MLP_deep_deep"}
+        self.known_costs = {"parameters", "parameters_with_MLP", "MLP", "MLP_deep", "MLP_deep_deep"}
         self.cost_function = cost_function
         if self.cost_function not in self.known_costs:
             raise NotImplementedError(f"Cost function: {self.cost_function} not implemented yet!")
@@ -54,11 +53,17 @@ class LightGCOT(nn.Module):
         if self.cost_function == "parameters":
             self.log_v_m = nn.Parameter(torch.log(torch.ones(m_potentials) / m_potentials))
             self.b_m = nn.Parameter(torch.randn(m_potentials, y_dim))
+        elif self.cost_function == "parameters_with_MLP":
+            self.log_v_m = nn.Parameter(torch.log(torch.ones(m_potentials) / m_potentials))
+            self.b_m = torchvision.ops.MLP(
+                in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
+            )
         elif self.cost_function == "MLP":
             self.log_v_m = nn.Sequential(
                 torchvision.ops.MLP(in_channels=x_dim, hidden_channels=[m_potentials], activation_layer=torch.nn.ReLU),
                 nn.LogSoftmax(dim=-1),
             )
+
             self.b_m = torchvision.ops.MLP(
                 in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
             )
@@ -107,7 +112,7 @@ class LightGCOT(nn.Module):
             raise NotImplementedError("Other options are not implemented yet!")
 
     def compute_log_w_n(self):  # -> [N]
-        return self.log_w_n / self.epsilon
+        return (self.log_w_n - torch.logsumexp(self.log_w_n, dim=0)) / self.epsilon
 
     def compute_a_n(self):  # -> [N x y_dim]
         return self.a_n
@@ -121,7 +126,7 @@ class LightGCOT(nn.Module):
 
     def compute_log_v_m(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x M]
         batch_size = batched_x.shape[0]
-        if self.cost_function == "parameters":
+        if self.cost_function in {"parameters", "parameters_with_MLP"}:
             return self.log_v_m.repeat(batch_size, 1)
         elif self.cost_function in {"MLP", "MLP_deep", "MLP_deep_deep"}:
             return self.log_v_m(batched_x)
@@ -132,7 +137,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
             return self.b_m.repeat(batch_size, 1, 1)
-        elif self.cost_function in {"MLP", "MLP_deep", "MLP_deep_deep"}:
+        elif self.cost_function in {"parameters_with_MLP", "MLP", "MLP_deep", "MLP_deep_deep"}:
             return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
         else:
             raise NotImplementedError("Other options are not implemented yet!")
@@ -163,7 +168,12 @@ class LightGCOT(nn.Module):
             return self.epsilon * gmm.log_prob(batched_y)  # [bs]
 
     def compute_dual_potential(
-        self, log_w_n: torch.Tensor, a_n: torch.Tensor, A_n: torch.Tensor, log_v_m: torch.Tensor, b_m: torch.Tensor
+        self,
+        log_w_n: torch.Tensor,
+        a_n: torch.Tensor,
+        A_n: torch.Tensor,
+        log_v_m: torch.Tensor,
+        b_m: torch.Tensor,
     ) -> torch.Tensor:  # -> [bs]
         log_Z_nm = self.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)
         return -self.epsilon * torch.logsumexp(log_Z_nm, dim=(1, 2))  # [bs]
@@ -194,20 +204,19 @@ class LightGCOT(nn.Module):
 
             log_Z_nm = self.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)  # [bs x N x M]
 
-            logits = log_Z_nm.view(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials)
+            logits = log_Z_nm.reshape(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials)
             if self.A_diagonal_init is not None:
                 scale = (
                     torch.sqrt(self.epsilon * A_n)[None, :, None, :]
                     .repeat(min(sampling_batch_size, batch_size), 1, self.m_potentials, 1)
-                    .view(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim)
+                    .reshape(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim)
                 )
-                loc = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).view(
+                loc = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).reshape(
                     min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim
                 )  # view([1 x N x 1 x y_dim] + [1 x N x 1 x y_dim] * [bs x 1 x M x y_dim] = [bs x N x M x y_dim]) = [bs x N * M]
                 mix = Categorical(logits=logits)
                 comp = Independent(Normal(loc=loc, scale=scale), 1)
                 gmm = MixtureSameFamily(mix, comp)
-
             else:
                 raise NotImplementedError("Other options are not implemented yet!")
 
