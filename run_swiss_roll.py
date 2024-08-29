@@ -47,20 +47,20 @@ def run_notebook_in_parallel(max_processes: int, notebook_name: str, param_grid:
 
 
 if __name__ == "__main__":
-    max_processes = 2
+    max_processes = 4
     notebook_name = "./notebooks/LightGCOT_swiss_roll.ipynb"
     param_grid = {
         "EPSILON": [1.0],
-        "N_POTENTIALS": [500],
-        "M_POTENTIALS": [2, 3],
+        "N_POTENTIALS": [50],
+        "M_POTENTIALS": [10],
         "EXP_COST": ["MLP"],
-        "M_X_UNPAIRED_SAMPLES": [4096],
-        "N_Y_UNPAIRED_SAMPLES": [4096],
+        "M_X_UNPAIRED_SAMPLES": [0, 512],
+        "N_Y_UNPAIRED_SAMPLES": [0, 512],
         "L_PAIRED_SAMPLES": [64],
-        "D_LR_PAIRED": [4e-3],
+        "D_LR_PAIRED": [3e-4],
         "D_LR_UNPAIRED": [1e-3],
-        "T_OUTER_STEPS": [1],
-        "MAX_STEPS": [300000],
+        "MAX_STEPS": [250000],
+        "MINIBATCH_COST": ["rotation-v2"],
     }
 
     # Run the notebooks in parallel

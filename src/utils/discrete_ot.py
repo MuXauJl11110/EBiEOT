@@ -16,6 +16,7 @@ class OTPlanSampler:
         method: str,
         reg: float = 0.05,
         reg_m: float = 1.0,
+        cost_function: str = "l2",
         normalize_cost=False,
         **kwargs,
     ):
@@ -30,6 +31,8 @@ class OTPlanSampler:
             Entropic regularization coefficients.
         reg_m : float (default : 1.0)
             Marginal relaxation term for unbalanced OT (`method='unbalanced'`).
+        cost_function : str (default : "l2")
+            Which cost should be used. Can be one of "l2", "anti-l2", "rotation", "rotation-v2".
         normalize_cost : bool (default : False)
             Whether to normalize the cost matrix by its maximum value.
             It should be set to `False` when using minibatches.
@@ -48,6 +51,7 @@ class OTPlanSampler:
             raise ValueError(f"Unknown method: {method}")
         self.reg = reg
         self.reg_m = reg_m
+        self.cost_function = cost_function
         self.normalize_cost = normalize_cost
         self.kwargs = kwargs
 
@@ -72,16 +76,37 @@ class OTPlanSampler:
             x0 = x0.reshape(x0.shape[0], -1)
         if x1.dim() > 2:
             x1 = x1.reshape(x1.shape[0], -1)
-        # M = torch.cdist(x0, -x1) ** 2
-        rotation_angle = torch.tensor(torch.pi / 2)
-        rotation_matrix = torch.tensor(
-            [
-                [torch.cos(rotation_angle), -torch.sin(rotation_angle)],
-                [torch.sin(rotation_angle), torch.cos(rotation_angle)],
-            ]
-        )
-        # M = torch.cdist(x0 @ rotation_matrix, -x1 @ rotation_matrix) ** 2
-        M = torch.cdist(x0, -x1 @ rotation_matrix) ** 2
+
+        if self.cost_function == "l2":
+            M = torch.cdist(x0, x1) ** 2
+        elif self.cost_function == "anti-l2":
+            M = torch.cdist(x0, x1) ** 2
+        elif self.cost_function == "rotation":
+            rotation_angle = torch.tensor(torch.pi / 2)
+            rotation_matrix = torch.tensor(
+                [
+                    [torch.cos(rotation_angle), -torch.sin(rotation_angle)],
+                    [torch.sin(rotation_angle), torch.cos(rotation_angle)],
+                ]
+            )
+            M = torch.cdist(x0, -x1 @ rotation_matrix) ** 2
+        elif self.cost_function == "rotation-v2":
+            rotation_angle = torch.tensor(torch.pi / 2)
+            rotation_matrix_A = torch.tensor(
+                [
+                    [torch.cos(rotation_angle), -torch.sin(rotation_angle)],
+                    [torch.sin(rotation_angle), torch.cos(rotation_angle)],
+                ]
+            )
+            rotation_matrix_B = torch.tensor(
+                [
+                    [torch.cos(-rotation_angle), -torch.sin(-rotation_angle)],
+                    [torch.sin(-rotation_angle), torch.cos(-rotation_angle)],
+                ]
+            )
+            M = torch.min(torch.cdist(x0, -x1 @ rotation_matrix_A), torch.cdist(x0, -x1 @ rotation_matrix_B))
+        else:
+            raise ValueError(f"Unkown cost function: {self.cost_function}!")
         if self.normalize_cost:
             M = M / M.max()  # should not be normalized when using minibatches
         p = self.ot_fn(a, b, M.detach().cpu().numpy())
