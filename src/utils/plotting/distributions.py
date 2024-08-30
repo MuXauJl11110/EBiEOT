@@ -291,7 +291,7 @@ def plot_swiss_roll(
     for _, ax in enumerate(axes):
         ax.set_xlim([-3.5, 3.5])
         ax.set_ylim([-3.5, 3.5])
-        ax.legend(loc="lower right")
+        ax.legend(loc="lower left")
 
     fig.tight_layout(pad=0.1)
 
