@@ -79,145 +79,6 @@ def plot_gaussians(
         plt.show()
 
 
-def plot_distributions(
-    model: LightGCOT,
-    X_sampler: Sampler,
-    Y_sampler: Sampler,
-    X_paired: torch.Tensor,
-    Y_paired: torch.Tensor,
-    starting_points: list[torch.Tensor],
-    gt_Y_points: list[np.ndarray],
-    num_ending_points: int = 256,
-    num_samples: int = 1024,
-    log: bool = False,
-) -> dict[str, wandb.Image] | None:
-    colors = cm.rainbow(np.linspace(0.1, 0.9, len(starting_points)))
-    num_subplots = 4
-    fig, axes = plt.subplots(1, num_subplots, figsize=(5 * num_subplots, 5), dpi=200)
-
-    for ax in axes:
-        ax.grid(zorder=-20)
-
-    x_samples = X_sampler.sample(num_samples)
-    y_samples = Y_sampler.sample(num_samples)
-
-    # First plot
-    axes[0].scatter(
-        x_samples[:, 0].cpu().numpy(),
-        x_samples[:, 1].cpu().numpy(),
-        alpha=0.3,
-        c="g",
-        s=32,
-        edgecolors="black",
-        label=r"Input distirubtion $p_0$",
-    )
-    axes[0].scatter(
-        y_samples[:, 0].cpu().numpy(),
-        y_samples[:, 1].cpu().numpy(),
-        c="orange",
-        s=32,
-        edgecolors="black",
-        label=r"Target distribution $p_1$",
-    )
-
-    # Second plot
-    axes[1].scatter(
-        X_paired[:, 0].cpu().numpy(),
-        X_paired[:, 1].cpu().numpy(),
-        alpha=0.3,
-        c="g",
-        s=32,
-        edgecolors="black",
-        label=r"Input paired samples from distribution $p_0$",
-    )
-    axes[1].scatter(
-        Y_paired[:, 0].cpu().numpy(),
-        Y_paired[:, 1].cpu().numpy(),
-        c="orange",
-        s=32,
-        edgecolors="black",
-        label=r"Target paired samples from distribution $p_1$",
-    )
-
-    for x, y in zip(X_paired.cpu().numpy(), Y_paired.cpu().numpy()):
-        axes[1].arrow(x[0], x[1], y[0] - x[0], y[1] - x[1], color="black")
-
-    # Third plot
-    axes[2].set_title(f"Ground truth mapping")
-    axes[2].scatter(
-        y_samples[:, 0].cpu().numpy(),
-        y_samples[:, 1].cpu().numpy(),
-        c="orange",
-        s=32,
-        edgecolors="black",
-        label=r"Target distribution $p_1$",
-    )
-    for color, point, gt_point in zip(colors, starting_points, gt_Y_points):
-        label = f"{point.cpu().numpy()}"
-        axes[2].scatter(
-            point[0].item(),
-            point[1].item(),
-            color=color,
-            label=label,
-            s=48,
-            zorder=3,
-            edgecolors="black",
-            marker="s",
-        )
-        axes[2].scatter(
-            gt_point[:, 0],
-            gt_point[:, 1],
-            color=color,
-            s=32,
-            zorder=3,
-            edgecolors="black",
-            marker="d",
-        )
-
-    # Fourth plot
-    y_pred = model(x_samples).cpu().numpy()
-    axes[3].scatter(
-        y_pred[:, 0], y_pred[:, 1], c="yellow", s=32, edgecolors="black", label="Fitted distribution", zorder=1
-    )
-
-    for color, point in zip(colors, starting_points):
-        label = f"{point.cpu().numpy()}"
-        repeated_starting_points = point[None, :].repeat(num_ending_points, 1)
-        point_pred = model(repeated_starting_points).cpu().numpy()
-        axes[3].scatter(
-            point[0].item(),
-            point[1].item(),
-            color=color,
-            label=label,
-            s=48,
-            zorder=3,
-            edgecolors="black",
-            marker="s",
-        )
-        axes[3].scatter(
-            point_pred[:, 0],
-            point_pred[:, 1],
-            color=color,
-            s=32,
-            zorder=3,
-            edgecolors="black",
-        )
-
-    for _, ax in enumerate(axes):
-        ax.set_xlim([-3.5, 3.5])
-        ax.set_ylim([-3.5, 3.5])
-        ax.legend(loc="lower right")
-
-    fig.tight_layout(pad=0.1)
-
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
-        plt.close(fig)
-        return distr_dict
-    else:
-        plt.show()
-
-
 def plot_PCA(
     model: LightGCOT,
     source_data: torch.Tensor,
@@ -298,9 +159,9 @@ def plot_PCA(
 
 
 def plot_swiss_roll(
+    models_dict: dict[str, torch.nn.Module],
     X_sampler: Sampler,
     Y_sampler: Sampler,
-    models_dict: dict[str, torch.nn.Module],
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
     starting_points: torch.Tensor,
@@ -311,8 +172,6 @@ def plot_swiss_roll(
 ) -> dict[str, wandb.Image] | None:
     num_starting_points = len(starting_points)
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
-    # num_x = len(M_X_unpaired_samples_list)
-    # num_y = len(N_Y_unpaired_samples_list)
     num_subplots = 3 + len(models_dict)
     fig, axes = plt.subplots(1, num_subplots, figsize=(5 * num_subplots, 5), dpi=200)
 

@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from src.samplers.base import Sampler
-from src.samplers.from_dataset import DatasetSampler
 from src.samplers.from_loader import PairedLoaderSampler
 from src.utils.discrete_ot import OTPlanSampler
 
