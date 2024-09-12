@@ -5,20 +5,29 @@ from matplotlib import pyplot as plt
 
 import wandb
 from src.models.light_gcot import LightGCOT
+from src.utils.plotting.distributions import pca
 
 
 def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Image] | None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
     color = cm.rainbow(np.linspace(0.1, 0.9, 1))
 
-    log_w_n = model.compute_log_w_n().cpu().detach().numpy()
-    a_n = model.compute_a_n().cpu().detach().numpy()
-    A_n = model.compute_A_n().cpu().detach().numpy()
+    log_w_n = model.compute_log_w_n()
+    a_n = model.compute_a_n()
+    A_n = model.compute_A_n()
 
-    coeffs = np.exp(log_w_n)
-    alphas = coeffs / np.sum(coeffs)
+    if A_n.size(1) != 2:
+        A_n = pca(A_n, 2)
+    if a_n.size(1) != 2:
+        a_n = pca(a_n, 2)
 
-    axes[0].scatter(np.arange(model.n_potentials), log_w_n, alpha=alphas, color=color)
+    a_n = a_n.cpu().detach().numpy()
+    A_n = A_n.cpu().detach().numpy()
+
+    log_coeffs = torch.logsumexp(log_w_n, dim=0)
+    alphas = 0.1 + torch.exp(log_w_n - log_coeffs).cpu().detach().numpy() * 0.9
+
+    axes[0].scatter(np.arange(model.n_potentials), log_w_n.cpu().detach().numpy(), alpha=alphas, color=color)
     axes[0].set_xlabel("N")
     axes[0].set_ylabel("value")
     axes[0].set_title(r"$\log{w_n}$")
@@ -52,14 +61,15 @@ def plot_B_parameters(
 
     num_starting_points = len(starting_points)
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
-    log_v_m = model.compute_log_v_m(starting_points).cpu().detach().numpy()
-    b_m = model.compute_b_m(starting_points).cpu().detach().numpy()
+    log_v_m = model.compute_log_v_m(starting_points)
+    b_m = model.compute_b_m(starting_points)  # [nsp x M x y_dim]
 
-    coeffs = np.exp(log_v_m)
-    alphas = coeffs / np.sum(coeffs)
+    log_coeffs = torch.logsumexp(log_v_m, dim=0)
+    alphas = 0.1 + torch.exp(log_v_m - log_coeffs).cpu().detach().numpy() * 0.9
+    log_v_m = log_v_m.cpu().detach().numpy()
 
     for i, (color, point) in enumerate(zip(colors, starting_points)):
-        label = f"{point.cpu().numpy()}"
+        label = f"{point.cpu().numpy()[:2]}"
 
         axes[0].scatter(np.arange(model.m_potentials), log_v_m[i], alpha=alphas, label=label, color=color)
         axes[0].set_xlabel("M")
@@ -67,7 +77,12 @@ def plot_B_parameters(
         axes[0].set_title(r"$\log{v_m(x)}$")
         axes[0].grid(zorder=-20)
 
-        axes[1].scatter(b_m[i, :, 0], b_m[i, :, 1], alpha=alphas, label=label, color=color)
+        if model.y_dim != 2:
+            b_m_i = pca(b_m[i], 2).cpu().detach().numpy()
+        else:
+            b_m_i = b_m[i].cpu().detach().numpy()
+
+        axes[1].scatter(b_m_i[:, 0], b_m_i[:, 1], alpha=alphas, label=label, color=color)
         axes[1].set_xlabel("x")
         axes[1].set_ylabel("y")
         axes[1].set_title(r"$b_m(x)$")
@@ -93,12 +108,13 @@ def plot_Z_parameters(
     log: bool = False,
 ) -> dict[str, wandb.Image] | None:
     if X_paired is not None and Y_paired is not None:
-        num_subplots = 5
+        fig, axes = plt.subplots(2, 4, figsize=(20, 10), dpi=200)
+        axes = axes.reshape(-1)
     elif X_paired is None and Y_paired is None:
-        num_subplots = 2
+        # num_subplots = 5
+        fig, axes = plt.subplots(1, 5, figsize=(25, 5), dpi=200, squeeze=False)
     else:
         raise ValueError("X_paired and Y_paired must be None or not None simultaneously!")
-    fig, axes = plt.subplots(1, num_subplots, figsize=(5 * num_subplots, 5), dpi=200)
 
     num_starting_points = len(starting_points)  # nsp
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
@@ -110,30 +126,35 @@ def plot_Z_parameters(
     a_n = model.compute_a_n()
     A_n = model.compute_A_n()
 
-    r_nm = (
-        (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :])
-        .reshape(num_starting_points, model.n_potentials * model.m_potentials, model.y_dim)
-        .cpu()
-        .detach()
-        .numpy()
-    )  # view([1 x N x 1 x y_dim] + [1 x N x 1 x y_dim] * [nsp x 1 x M x y_dim] = [nsp x N x M x y_dim]) = [nsp x N * M]
-    log_Z_nm = (
-        model.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)
-        .reshape(num_starting_points, model.n_potentials * model.m_potentials)
-        .cpu()
-        .detach()
-        .numpy()
+    r_nm = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).reshape(
+        num_starting_points, model.n_potentials * model.m_potentials, model.y_dim
+    )  # [nsp x N * M x y_dim]
+    log_Z_nm = model.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m).reshape(
+        num_starting_points, model.n_potentials * model.m_potentials
     )  # [nsp x N * M]
 
-    for i, (color, point) in enumerate(zip(colors, starting_points)):
-        label = f"{point.cpu().numpy()}"
+    bT_A = b_m[:, None, :, :] * A_n[None, :, None, :]
+    # [bs x 1 x M x y_dim] * [1 x N x 1 x y_dim] = [bs x N x M x y_dim]
+    bT_A_b = torch.sum(bT_A * b_m[:, None, :, :], dim=3).cpu().detach().numpy()
+    aT_b = torch.sum(2 * a_n[None, :, None, :] * b_m[:, None, :, :], dim=3).cpu().detach().numpy()
+    correction = 0.5 * (bT_A_b + aT_b) / model.epsilon.cpu().detach().numpy()
 
-        coeffs = np.exp(log_Z_nm[i])
-        alphas = coeffs / np.sum(coeffs)
+    log_coeffs = torch.logsumexp(log_Z_nm, dim=1)
+    alphas = 0.1 + torch.exp(log_Z_nm - log_coeffs[:, None]).cpu().detach().numpy() * 0.9
+    log_Z_nm = log_Z_nm.cpu().detach().numpy()
+
+    for i, (color, point) in enumerate(zip(colors, starting_points)):
+        label = f"{point.cpu().numpy()[:2]}"
+
+        alpha = alphas[i]
+        if model.y_dim != 2:
+            r_nm_i = pca(r_nm[i]).cpu().detach().numpy()
+        else:
+            r_nm_i = r_nm[i].cpu().detach().numpy()
         axes[0].scatter(
-            r_nm[i, :, 0],
-            r_nm[i, :, 1],
-            alpha=alphas,
+            r_nm_i[:, 0],
+            r_nm_i[:, 1],
+            alpha=alpha,
             label=label,
             color=color,
         )
@@ -145,7 +166,7 @@ def plot_Z_parameters(
         axes[1].scatter(
             np.arange(model.n_potentials * model.m_potentials),
             log_Z_nm[i],
-            alpha=alphas,
+            alpha=alpha,
             label=label,
             color=color,
         )
@@ -154,58 +175,97 @@ def plot_Z_parameters(
         axes[1].set_title(r"$\log{Z_{nm}(x)}$")
         axes[1].grid(zorder=-20)
 
+        axes[2].scatter(
+            np.arange(model.n_potentials * model.m_potentials),
+            bT_A_b[i],
+            alpha=alpha,
+            label=label,
+            color=color,
+        )
+        axes[2].set_xlabel("N * M")
+        axes[2].set_ylabel("value")
+        axes[2].set_title(r"$b_m(x)^\top A_n b_m(x)$")
+        axes[2].grid(zorder=-20)
+
+        axes[3].scatter(
+            np.arange(model.n_potentials * model.m_potentials),
+            aT_b[i],
+            alpha=alpha,
+            label=label,
+            color=color,
+        )
+        axes[3].set_xlabel("N * M")
+        axes[3].set_ylabel("value")
+        axes[3].set_title(r"$2 \cdot b_m(x)^\top a_n$")
+        axes[3].grid(zorder=-20)
+
+        axes[4].scatter(
+            np.arange(model.n_potentials * model.m_potentials),
+            correction[i],
+            alpha=alpha,
+            label=label,
+            color=color,
+        )
+        axes[4].set_xlabel("N * M")
+        axes[4].set_ylabel("value")
+        axes[4].set_title(r"$\dfrac{b_m(x)^\top A_n b_m(x) + 2 \cdot b_m(x)^\top a_n}{2 \varepsilon}$")
+        axes[4].grid(zorder=-20)
+
     if X_paired is not None and Y_paired is not None:
         num_starting_paired_points = len(X_paired)
         colors_paired = cm.rainbow(np.linspace(0.1, 0.9, num_starting_paired_points))
 
-        log_v_m_cost = model.compute_log_v_m(X_paired).cpu().detach().numpy()
+        log_v_m_cost = model.compute_log_v_m(X_paired)
         b_m_cost = model.compute_b_m(X_paired)
         scalar_product_m = (
             torch.sum(b_m_cost * Y_paired[:, None, :], dim=2).cpu().detach().numpy()
         )  # sum([bs x M x y_dim] * [bs x 1 x y_dim], dim=(1, 2)) = [bs x M]
 
+        log_coeffs = torch.logsumexp(log_v_m_cost, dim=1)
+        alphas = 0.1 + torch.exp(log_v_m_cost - log_coeffs[:, None]).cpu().detach().numpy() * 0.9
+        log_v_m_cost = log_v_m_cost.cpu().detach().numpy()
+
         for i, (color, point) in enumerate(zip(colors_paired, X_paired.cpu().numpy())):
             label = f"[{point[0]:.2f}, {point[1]:.2f}]"
 
-            coeffs = np.exp(log_v_m_cost[i])
-            alphas = coeffs / np.sum(coeffs)
-            axes[2].scatter(
+            alpha = alphas[i]
+            axes[5].scatter(
                 np.arange(model.m_potentials),
                 log_v_m_cost[i],
-                alpha=alphas,
+                alpha=alpha,
                 label=label,
                 color=color,
             )
-            axes[2].set_xlabel("M")
-            axes[2].set_ylabel("value")
-            axes[2].set_title(r"$\log{v_m}(x_{paired})$")
-            axes[2].grid(zorder=-20)
+            axes[5].set_xlabel("M")
+            axes[5].set_ylabel("value")
+            axes[5].set_title(r"$\log{v_m}(x_{paired})$")
+            axes[5].grid(zorder=-20)
 
-            axes[3].scatter(
+            axes[6].scatter(
                 np.arange(model.m_potentials),
                 scalar_product_m[i],
-                alpha=alphas,
+                alpha=alpha,
                 label=label,
                 color=color,
             )
-            axes[3].set_xlabel("M")
-            axes[3].set_ylabel("value")
-            axes[3].set_title(r"$\langle b_m(x_{paired}), y_{paired} \rangle$")
-            axes[3].grid(zorder=-20)
+            axes[6].set_xlabel("M")
+            axes[6].set_ylabel("value")
+            axes[6].set_title(r"$\langle b_m(x_{paired}), y_{paired} \rangle$")
+            axes[6].grid(zorder=-20)
 
-            axes[4].scatter(
+            axes[7].scatter(
                 np.arange(model.m_potentials),
                 -scalar_product_m[i] / model.epsilon.cpu().detach().numpy() - log_v_m_cost[i],
-                alpha=alphas,
+                alpha=alpha,
                 label=label,
                 color=color,
             )
-            axes[4].set_xlabel("M")
-            axes[4].set_ylabel("value")
-            axes[4].set_title(
+            axes[7].set_xlabel("M")
+            axes[7].set_ylabel("value")
+            axes[7].set_title(
                 r"$-\log{v_m}(x_{paired})-\dfrac{\langle b_m(x_{paired}), y_{paired} \rangle}{\varepsilon}$"
             )
-            axes[4].grid(zorder=-20)
+            axes[7].grid(zorder=-20)
 
     for _, ax in enumerate(axes):
         ax.legend(loc="lower right")

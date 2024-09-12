@@ -1,4 +1,5 @@
 import os
+import random
 
 import numpy as np
 import torch
@@ -6,7 +7,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from src.samplers.base import Sampler
-from src.samplers.from_loader import PairedLoaderSampler
+from src.samplers.from_loader import PairedLoaderSampler, PairedWithLabelsLoaderSampler
 from src.utils.discrete_ot import OTPlanSampler
 
 
@@ -53,12 +54,14 @@ def generate_paired_data(
 
 
 def get_paired_sampler(
-    X_paired: torch.Tensor, Y_paired: torch.Tensor, batch_size: int, l_paired_samples: int, device: str = "cuda"
+    X_paired: torch.Tensor, Y_paired: torch.Tensor, batch_size: int, num_samples: int, device: str = "cuda"
 ) -> PairedLoaderSampler:
-    loader_kwargs = {"num_workers": 0, "generator": torch.Generator(device=device)}
+    assert len(X_paired) == len(Y_paired)
+    loader_kwargs = {"num_workers": 0, "generator": torch.Generator(device=X_paired.device)}
+    ind = random.choices(range(len(X_paired)), k=min(num_samples, len(X_paired)))
     paired_loader = DataLoader(
-        TensorDataset(X_paired, Y_paired),
-        batch_size=min(batch_size, l_paired_samples),
+        TensorDataset(X_paired[ind], Y_paired[ind]),
+        batch_size=min(batch_size, num_samples),
         shuffle=True,
         drop_last=True,
         **loader_kwargs,
@@ -85,3 +88,28 @@ def get_GT_points(
         gt_Y_points.append(np.array(_gt_points))
 
     return gt_Y_points
+
+
+def get_paired_with_labels_sampler(
+    X_paired: torch.Tensor,
+    X_labels_paired: torch.Tensor,
+    Y_paired: torch.Tensor,
+    Y_labels_paired: torch.Tensor,
+    batch_size: int,
+    num_samples: int,
+    device: str = "cuda",
+) -> PairedLoaderSampler:
+    assert len(X_paired) == len(Y_paired)
+    loader_kwargs = {
+        "num_workers": 0,
+        "generator": torch.Generator(device=X_paired.device),
+    }
+    ind = random.choices(range(len(X_paired)), k=min(num_samples, len(X_paired)))
+    paired_loader = DataLoader(
+        TensorDataset(X_paired[ind], X_labels_paired[ind], Y_paired[ind], Y_labels_paired[ind]),
+        batch_size=min(batch_size, num_samples),
+        shuffle=True,
+        drop_last=True,
+        **loader_kwargs,
+    )
+    return PairedWithLabelsLoaderSampler(paired_loader, device=device)

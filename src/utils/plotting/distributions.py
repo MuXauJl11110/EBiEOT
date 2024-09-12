@@ -301,3 +301,49 @@ def plot_swiss_roll(
         return distr_dict
     else:
         plt.show()
+
+
+def pca(input: torch.Tensor, k: int = 2) -> torch.Tensor:
+    input = input.flatten(1)
+    *_, V = torch.pca_lowrank(input, q=k)
+    return input @ V[:, :k]
+
+
+@torch.no_grad()
+def get_transport_plot_pca(
+    source_samples: torch.Tensor,
+    target_samples: torch.Tensor,
+    moved_samples: torch.Tensor,
+    *,
+    colors=None,
+    log=False,
+    **figure_kwargs,
+):
+    if source_samples.size(1) != 2:
+        source_samples = pca(source_samples, 2)
+
+    if moved_samples.size(1) != 2:
+        moved_samples, target_samples = pca(torch.cat([moved_samples, target_samples]), 2).chunk(2)
+
+    figure = plt.figure(**figure_kwargs)
+
+    if colors is None:
+        colors = source_samples[:, 1].cpu()
+
+    source_axis = figure.add_subplot(1, 2, 1)
+    source_axis.scatter(*source_samples.cpu().T, c=colors, label="Source samples", alpha=0.5)
+    source_axis.set_title("Source space")
+
+    target_axis = figure.add_subplot(1, 2, 2)
+    target_axis.scatter(*target_samples.cpu().T, c="black", label="Target samples", alpha=0.5)
+    target_axis.scatter(*moved_samples.cpu().T, c=colors, label="Moved samples", alpha=0.5)
+    target_axis.set_title("Target space")
+    target_axis.legend()
+
+    if log:
+        mapping_dict = {"Mapping": wandb.Image(figure)}
+        plt.close(figure)
+        return mapping_dict
+    else:
+        plt.show()
+        return

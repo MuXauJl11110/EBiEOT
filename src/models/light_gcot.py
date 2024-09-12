@@ -44,7 +44,7 @@ class LightGCOT(nn.Module):
         if A_diagonal_init is not None:
             self.log_A_n = nn.Parameter(torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim)))  # [N x y_dim]
 
-        self.known_costs = {"parameters", "parameters_with_MLP", "MLP", "MLP_deep", "MLP_deep_deep"}
+        self.known_costs = {"parameters", "parameters_with_MLP", "MLP", "MLP_deep", "MLP_deep_deep", "MLP_text"}
         self.cost_function = cost_function
         if self.cost_function not in self.known_costs:
             raise NotImplementedError(f"Cost function: {self.cost_function} not implemented yet!")
@@ -73,7 +73,9 @@ class LightGCOT(nn.Module):
                 nn.LogSoftmax(dim=-1),
             )
             self.b_m = torchvision.ops.MLP(
-                in_channels=x_dim, hidden_channels=[m_potentials, m_potentials * y_dim], activation_layer=torch.nn.ReLU
+                in_channels=x_dim,
+                hidden_channels=[m_potentials, m_potentials * y_dim],
+                activation_layer=torch.nn.ReLU,
             )
         elif self.cost_function == "MLP_deep_deep":
             self.log_v_m = nn.Sequential(
@@ -88,6 +90,21 @@ class LightGCOT(nn.Module):
                 in_channels=x_dim,
                 hidden_channels=[m_potentials, m_potentials * y_dim],
                 activation_layer=torch.nn.ReLU,
+            )
+        elif self.cost_function == "MLP_text":
+            self.log_v_m = nn.Sequential(
+                torchvision.ops.MLP(
+                    in_channels=x_dim,
+                    hidden_channels=[m_potentials],
+                    activation_layer=torch.nn.ReLU,
+                ),
+                nn.LogSoftmax(dim=-1),
+            )
+            self.b_m = torchvision.ops.MLP(
+                in_channels=x_dim,
+                hidden_channels=[2 * m_potentials * y_dim, m_potentials * y_dim],
+                # hidden_channels=[y_dim, m_potentials * y_dim],
+                activation_layer=torch.nn.SELU,
             )
 
     def init_a_by_samples(self, samples: torch.Tensor):
@@ -119,7 +136,7 @@ class LightGCOT(nn.Module):
 
     def compute_A_n(self):  # -> [N x y_dim]
         if self.A_diagonal_init is not None:
-            A_n = torch.exp(self.log_A_n)
+            A_n = torch.exp(self.log_A_n) + 1e-12
         else:
             raise NotImplementedError("Other options are not implemented yet!")
         return A_n
@@ -128,7 +145,7 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function in {"parameters", "parameters_with_MLP"}:
             return self.log_v_m.repeat(batch_size, 1)
-        elif self.cost_function in {"MLP", "MLP_deep", "MLP_deep_deep"}:
+        elif self.cost_function in {"MLP", "MLP_deep", "MLP_deep_deep", "MLP_text"}:
             return self.log_v_m(batched_x)
         else:
             raise NotImplementedError("Other options are not implemented yet!")
@@ -137,8 +154,10 @@ class LightGCOT(nn.Module):
         batch_size = batched_x.shape[0]
         if self.cost_function == "parameters":
             return self.b_m.repeat(batch_size, 1, 1)
-        elif self.cost_function in {"parameters_with_MLP", "MLP", "MLP_deep", "MLP_deep_deep"}:
+        elif self.cost_function in {"parameters_with_MLP", "MLP", "MLP_deep", "MLP_deep_deep", "MLP_text"}:
             return self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
+            # b_m = self.b_m(batched_x).reshape(batch_size, self.m_potentials, self.y_dim)
+            # return torch.nn.functional.normalize(b_m, dim=(1, 2))
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
@@ -154,7 +173,7 @@ class LightGCOT(nn.Module):
             )  # sum(([bs x N x M x y_dim] + [1 x N x 1 x y_dim]) * [bs x 1 x M x y_dim], dim=3) = [bs x N x M]
             return (
                 log_v_m[:, None, :] + log_w_n[None, :, None] + 0.5 * correction / self.epsilon
-            )  # [bs x 1 x M] + [1 x N x 1] + [bs x N x M]
+            ) + 1e-12  # [bs x 1 x M] + [1 x N x 1] + [bs x N x M]
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
@@ -204,15 +223,15 @@ class LightGCOT(nn.Module):
 
             log_Z_nm = self.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)  # [bs x N x M]
 
-            logits = log_Z_nm.reshape(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials)
+            logits = log_Z_nm.reshape(sub_batch_x.shape[0], self.n_potentials * self.m_potentials)
             if self.A_diagonal_init is not None:
                 scale = (
                     torch.sqrt(self.epsilon * A_n)[None, :, None, :]
-                    .repeat(min(sampling_batch_size, batch_size), 1, self.m_potentials, 1)
-                    .reshape(min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim)
+                    .repeat(sub_batch_x.shape[0], 1, self.m_potentials, 1)
+                    .reshape(sub_batch_x.shape[0], self.n_potentials * self.m_potentials, self.y_dim)
                 )
                 loc = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).reshape(
-                    min(sampling_batch_size, batch_size), self.n_potentials * self.m_potentials, self.y_dim
+                    sub_batch_x.shape[0], self.n_potentials * self.m_potentials, self.y_dim
                 )  # view([1 x N x 1 x y_dim] + [1 x N x 1 x y_dim] * [bs x 1 x M x y_dim] = [bs x N x M x y_dim]) = [bs x N * M]
                 mix = Categorical(logits=logits)
                 comp = Independent(Normal(loc=loc, scale=scale), 1)
@@ -225,3 +244,24 @@ class LightGCOT(nn.Module):
         samples = torch.cat(samples, dim=0)
 
         return samples
+
+    def compute_unpaired_loss(self, X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
+        log_v_m = self.compute_log_v_m(X)  # [bs x M]
+        b_m = self.compute_b_m(X)  # [bs x M x y_dim]
+
+        log_w_n = self.compute_log_w_n()  # [N]
+        a_n = self.compute_a_n()  # [N x y_dim]
+        A_n = self.compute_A_n()  # [N x y_dim]
+
+        f_c = self.compute_dual_potential(log_w_n, a_n, A_n, log_v_m, b_m)
+        f = self.compute_primal_potential(Y, log_w_n, a_n, A_n)
+
+        return -(f_c + f).mean()
+
+    def compute_paired_loss(self, X_paired: torch.Tensor, Y_paired: torch.Tensor) -> torch.Tensor:
+        log_v_m_paired = self.compute_log_v_m(X_paired)  # [bs x M]
+        b_m_paired = self.compute_b_m(X_paired)  # [bs x M x y_dim]
+
+        c = self.compute_cost(Y_paired, log_v_m_paired, b_m_paired)
+
+        return c.mean()

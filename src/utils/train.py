@@ -18,7 +18,7 @@ def compute_loss(
     Y_unpaired: torch.Tensor,
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
-) -> torch.Tensor:
+) -> float:
     log_w_n = model.compute_log_w_n()  # [N]
     a_n = model.compute_a_n()  # [N x y_dim]
     A_n = model.compute_A_n()  # [N x y_dim]
@@ -35,4 +35,4 @@ def compute_loss(
     c = model.compute_cost(Y_paired, log_v_m_paired, b_m_paired)
 
     paired_loss = c.mean()
-    return paired_loss + unpaired_loss
+    return (paired_loss + unpaired_loss).item()
