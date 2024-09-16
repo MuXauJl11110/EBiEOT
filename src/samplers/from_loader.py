@@ -51,7 +51,7 @@ class PairedLoaderSampler(Sampler):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         with torch.no_grad():
             try:
-                X, Y = А(generator)
+                X, Y = next(generator)
             except StopIteration:
                 generator = iter(loader)
                 X, Y = next(generator)
