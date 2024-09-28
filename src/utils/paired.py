@@ -27,7 +27,7 @@ def generate_paired_data(
 
         X_paired_list, Y_paired_list = [], []
 
-        for _ in tqdm(range(2 * num_samples)):
+        for _ in tqdm(range(2 * num_samples)): # the first part for train, another for test
             _X_paired, _Y_paired = X_sampler.sample(mini_batch_size), Y_sampler.sample(mini_batch_size)
             _X_paired, _Y_paired = mini_batch_sampler.sample_plan(_X_paired, _Y_paired)
             X_paired_list.append(_X_paired[0])

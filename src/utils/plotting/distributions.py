@@ -171,7 +171,7 @@ def plot_swiss_roll(
     Y_paired: torch.Tensor,
     starting_points: torch.Tensor,
     gt_Y_points: list[np.ndarray],
-    num_ending_points: int = 32,
+    num_ending_points: int = 64,
     num_samples: int = 1024,
     x_lim: tuple[float, float] = (-2.5, 2.5),
     y_lim: tuple[float, float] = (-2.5, 2.5),
@@ -201,7 +201,7 @@ def plot_swiss_roll(
         c="g",
         s=32,
         edgecolors="black",
-        label=r"Input distribution $p(x)$",
+        label=r"Input distribution $\pi^*_x$",
     )
     axes[0].scatter(
         y_samples[:, 0].cpu().numpy(),
@@ -209,7 +209,7 @@ def plot_swiss_roll(
         c="orange",
         s=32,
         edgecolors="black",
-        label=r"Target distribution $q(y)$",
+        label=r"Target distribution $\pi^*_y$",
     )
     save_filenames.append("source_target")
     # Second plot
@@ -221,7 +221,7 @@ def plot_swiss_roll(
         s=32,
         edgecolors="black",
         zorder=2,
-        label=r"Input paired samples $x \sim \pi^\star(x)$",
+        label=r"Input paired samples $x \sim \pi^*_x$",
     )
     axes[1].scatter(
         Y_paired[:, 0].cpu().numpy(),
@@ -230,7 +230,7 @@ def plot_swiss_roll(
         s=32,
         edgecolors="black",
         zorder=2,
-        label=r"Target paired samples $y \sim \pi^\star(y)$",
+        label=r"Target paired samples $y \sim \pi^*_y$",
     )
     save_filenames.append("paired_data")
 
@@ -281,8 +281,8 @@ def plot_swiss_roll(
     axes[2].legend(
         [default_legend, tuple(legend_start), tuple(legend_end)],
         [
-            "Target distribution",
-            r"Source samples $x\sim p(x)$",
+            r"Target distribution $\pi^*_y$",
+            r"Source samples $x\sim \pi^*_x$",
             r"Ground-truth samples $y \sim \pi^\star(\cdot\vert x)$",
         ],
         handler_map={tuple: HandlerTuple(ndivide=None, pad=1)},
@@ -346,7 +346,11 @@ def plot_swiss_roll(
 
         axes[ax_index].legend(
             [default_legend, tuple(legend_start), tuple(legend_end)],
-            ["Fitted distribution", r"Source samples $x\sim p(x)$", r"Conditional samples $y \sim \pi(\cdot\vert x)$"],
+            [
+                r"Fitted distribution $\pi^\theta_y$",
+                r"Source samples $x\sim \pi^*_x$",
+                r"Conditional samples $y \sim \pi^\theta(\cdot\vert x)$",
+            ],
             handler_map={tuple: HandlerTuple(ndivide=None, pad=1)},
             loc="lower left",
             prop={"size": 9},
@@ -360,7 +364,7 @@ def plot_swiss_roll(
         ax.set_ylim(y_lim)
         ax.legend(loc="lower left")
 
-    fig.tight_layout(pad=0.1)
+    fig.tight_layout()
 
     if save_dir is not None:
         os.makedirs(save_dir, exist_ok=True)
