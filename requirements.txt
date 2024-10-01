@@ -1,0 +1,15 @@
+gensim==4.3.2
+matplotlib==3.9.2
+nflows==0.14
+numpy==2.1.1
+pandas==2.2.3
+papermill==2.6.0
+Pillow==10.4.0
+POT==0.9.4
+pytest==7.4.4
+scikit_learn==1.5.2
+torch==2.3.1+cpu
+torch==2.3.1
+torchvision==0.18.1
+torchvision==0.18.1+cpu
+tqdm==4.66.4

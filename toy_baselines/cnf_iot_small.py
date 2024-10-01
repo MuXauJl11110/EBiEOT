@@ -1,56 +1,26 @@
+import gc
 import os
 import sys
-import gc
 
 sys.path.append("..")
 
 import random
-from typing import List, Tuple, Dict
+
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from nflows.nn import nets as nets
 from tqdm import tqdm
-import wandb
 
-from src.models.light_gcot import LightGCOT
+import wandb
+from src.models.models import ConditionalRealNVP
 from src.samplers.from_dataset import DatasetSampler
 from src.samplers.primary import StandardNormalSampler, SwissRollSampler
 from src.utils.discrete_ot import OTPlanSampler
 from src.utils.paired import generate_paired_data, get_GT_points, get_paired_sampler
-from src.utils.plotting.distributions import plot_swiss_roll
-from src.utils.plotting.parameters import (
-    plot_A_parameters,
-    plot_B_parameters,
-    plot_Z_parameters,
-)
-from src.utils.train import compute_loss, update_average
-
-import itertools
-from nflows.distributions.normal import ConditionalDiagonalNormal
-from nflows.flows.base import Flow
-from nflows.nn import nets as nets
-from nflows.transforms.base import CompositeTransform
-from nflows.transforms.coupling import (
-    AdditiveCouplingTransform,
-    AffineCouplingTransform,
-)
-from nflows.transforms.normalization import BatchNorm
-from nflows.distributions.normal import StandardNormal
-from nflows.transforms.autoregressive import MaskedAffineAutoregressiveTransform
-from nflows.transforms.permutations import RandomPermutation, ReversePermutation
-
-import matplotlib.cm as cm
-import numpy as np
-import torch
-from matplotlib import pyplot as plt
-
-from src.models.models import ConditionalRealNVP, compat_patch, ConditionalMaskedAutoregressiveFlow
-
 
 if __name__ == "__main__":
     device = torch.device("cuda")
-    os.system('wandb login <your token>')
+    os.system("wandb login <your token>")
 
     X_DIM = 2
     Y_DIM = 2
@@ -74,7 +44,7 @@ if __name__ == "__main__":
 
     M_X_UNPAIRED_SAMPLES = 0
     N_Y_UNPAIRED_SAMPLES = 1024
-    L_PAIRED_SAMPLES = 16000 #128
+    L_PAIRED_SAMPLES = 16000  # 128
 
     SAVE_EVERY = 100000
     MAX_STEPS = 2500000
@@ -125,7 +95,7 @@ if __name__ == "__main__":
         L_PAIRED_SAMPLES=L_PAIRED_SAMPLES,
     )
 
-    wandb.init(name=EXP_NAME, project='inverse_ot', config=config)
+    wandb.init(name=EXP_NAME, project="inverse_ot", config=config)
 
     X_sampler = StandardNormalSampler(dim=2, device=device)
     Y_sampler = SwissRollSampler(dim=2, device=device, dtype=dtype)
@@ -146,17 +116,16 @@ if __name__ == "__main__":
 
     if M_X_UNPAIRED_SAMPLES > 0:
         source_data = X_sampler.sample(M_X_UNPAIRED_SAMPLES)
-        usd_sampler = DatasetSampler(source_data, device=device) # usd - unpaired source data
+        usd_sampler = DatasetSampler(source_data, device=device)  # usd - unpaired source data
     else:
         usd_sampler = DatasetSampler(X_paired_train, device=device)
 
     if N_Y_UNPAIRED_SAMPLES > 0:
         target_data = Y_sampler.sample(N_Y_UNPAIRED_SAMPLES)
-        utd_sampler = DatasetSampler(target_data, device=device) # utd - unpaired target data
+        utd_sampler = DatasetSampler(target_data, device=device)  # utd - unpaired target data
     else:
         utd_sampler = DatasetSampler(Y_paired_train, device=device)
 
-    
     starting_points = torch.tensor([[-2.0, 0.0], [2.0, 2.0], [-0.5, -0.75]])
     num_ending_points = 64
 
@@ -174,7 +143,7 @@ if __name__ == "__main__":
         hidden_features=128,
         num_blocks_per_layer=4,
         num_layers=5,
-        use_volume_preserving=False
+        use_volume_preserving=False,
     ).to(device)
 
     T_opt_paired = torch.optim.Adam(T.parameters(), lr=D_LR_PAIRED, weight_decay=0.01)
@@ -187,9 +156,7 @@ if __name__ == "__main__":
 
         T_opt_paired.zero_grad()
         X_paired, Y_paired = pd_train_sampler.sample(BATCH_SIZE)
-        log_prob = T.log_prob(
-            inputs=Y_paired, context=X_paired
-        )
+        log_prob = T.log_prob(inputs=Y_paired, context=X_paired)
 
         T_loss = -log_prob.mean()
         T_loss.backward()
@@ -197,7 +164,7 @@ if __name__ == "__main__":
 
         wandb.log({f"Loss": T_loss}, step=step)
 
-        if (step+1) % SAVE_EVERY == 0:
+        if (step + 1) % SAVE_EVERY == 0:
             torch.save(T.state_dict(), os.path.join(OUTPUT_MODEL_PATH, f"T_{step}.pt"))
         gc.collect()
         torch.cuda.empty_cache()

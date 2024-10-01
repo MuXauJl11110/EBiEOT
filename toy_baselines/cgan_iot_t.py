@@ -1,6 +1,6 @@
+import gc
 import os
 import sys
-import gc
 
 sys.path.append("..")
 
@@ -8,41 +8,21 @@ import random
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import optim
 from tqdm import tqdm
 
-from src.models.light_gcot import LightGCOT
+import wandb
+from src.models.models import MyCDiscriminator, MyCGenerator
 from src.samplers.from_dataset import DatasetSampler
 from src.samplers.primary import StandardNormalSampler, SwissRollSampler
 from src.utils.discrete_ot import OTPlanSampler
 from src.utils.paired import generate_paired_data, get_GT_points, get_paired_sampler
-from src.utils.plotting.distributions import plot_swiss_roll
-from src.utils.plotting.parameters import (
-    plot_A_parameters,
-    plot_B_parameters,
-    plot_Z_parameters,
-)
-from src.utils.train import compute_loss, update_average
-
-import matplotlib.cm as cm
-import numpy as np
-import torch
-from matplotlib import pyplot as plt
-
-import math
-import time
-
-from src.utils.discrete_ot import OTPlanSampler
-from functools import partial
-from torch import optim
-import wandb
-
-from src.models.models import MyCDiscriminator, MyCGenerator
 
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
+
     __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
@@ -64,13 +44,13 @@ A_DIAGONAL_INIT = 0.1
 BATCH_SIZE = 128
 SAMPLING_BATCH_SIZE = 128
 
-D_LR_PAIRED = 3e-4 # 1e-3 for eps 0.1, 0.01 and 3e-4 for eps 0.002
+D_LR_PAIRED = 3e-4  # 1e-3 for eps 0.1, 0.01 and 3e-4 for eps 0.002
 D_LR_UNPAIRED = 1e-3
 D_GRADIENT_MAX_NORM = float("inf")
 
-M_X_UNPAIRED_SAMPLES = 16000 #1024
+M_X_UNPAIRED_SAMPLES = 16000  # 1024
 N_Y_UNPAIRED_SAMPLES = 0
-L_PAIRED_SAMPLES = 16000 #128
+L_PAIRED_SAMPLES = 16000  # 128
 
 SAVE_EVERY = 25000
 MAX_STEPS = 250000
@@ -117,44 +97,44 @@ config = dict(
 
 
 args = {
-    'nz': 1,
-    'num_timesteps': 1,
-    'x_dim': 2,
-    't_dim': 2,
-    'out_dim': 2,
-    'beta_min': 0.1,
-    'beta_max': 20.,
-    'layers_G': [256, 256, 256],
-    'layers_D': [256, 256, 256],
-    'num_iterations': 200000,
-    'batch_size': 128,
-    'lr_d': 1e-4,
-    'lr_g': 1e-4,
-    'beta1': 0.5,
-    'beta2': 0.9,
-    'r1_gamma': 0.01,
-    'lazy_reg': 1,
-    'use_ema': False,
-    'ema_decay': 0.999,
-    'sampler_precalc': 1000,
-    'sampler_gen_params':{},
-    'exp_path': "./swiss_roll/",
-    'save_ckpt':True,
-    'save_ckpt_every': 5000,
-    'save_content':True,
-    'save_content_every': 5000,
-    'visualize':True,
-    'visualize_every': 1000,
-    'print': True,
-    'print_every': 100,
-    'resume': False,
+    "nz": 1,
+    "num_timesteps": 1,
+    "x_dim": 2,
+    "t_dim": 2,
+    "out_dim": 2,
+    "beta_min": 0.1,
+    "beta_max": 20.0,
+    "layers_G": [256, 256, 256],
+    "layers_D": [256, 256, 256],
+    "num_iterations": 200000,
+    "batch_size": 128,
+    "lr_d": 1e-4,
+    "lr_g": 1e-4,
+    "beta1": 0.5,
+    "beta2": 0.9,
+    "r1_gamma": 0.01,
+    "lazy_reg": 1,
+    "use_ema": False,
+    "ema_decay": 0.999,
+    "sampler_precalc": 1000,
+    "sampler_gen_params": {},
+    "exp_path": "./swiss_roll/",
+    "save_ckpt": True,
+    "save_ckpt_every": 5000,
+    "save_content": True,
+    "save_content_every": 5000,
+    "visualize": True,
+    "visualize_every": 1000,
+    "print": True,
+    "print_every": 100,
+    "resume": False,
 }
 args = dotdict(args)
 
 
 if __name__ == "__main__":
     device = torch.device("cuda")
-    os.system('wandb login <your token>')
+    os.system("wandb login <your token>")
 
     torch.set_default_device(device)
     dtype = torch.float32
@@ -163,7 +143,7 @@ if __name__ == "__main__":
     torch.manual_seed(OUTPUT_SEED)
     np.random.seed(OUTPUT_SEED)
 
-    wandb.init(name=EXP_NAME, project='inverse_ot', config=config)
+    wandb.init(name=EXP_NAME, project="inverse_ot", config=config)
 
     X_sampler = StandardNormalSampler(dim=2, device=device)
     Y_sampler = SwissRollSampler(dim=2, device=device, dtype=dtype)
@@ -184,13 +164,13 @@ if __name__ == "__main__":
 
     if M_X_UNPAIRED_SAMPLES > 0:
         source_data = X_sampler.sample(M_X_UNPAIRED_SAMPLES)
-        usd_sampler = DatasetSampler(source_data, device=device) # usd - unpaired source data
+        usd_sampler = DatasetSampler(source_data, device=device)  # usd - unpaired source data
     else:
         usd_sampler = DatasetSampler(X_paired_train, device=device)
 
     if N_Y_UNPAIRED_SAMPLES > 0:
         target_data = Y_sampler.sample(N_Y_UNPAIRED_SAMPLES)
-        utd_sampler = DatasetSampler(target_data, device=device) # utd - unpaired target data
+        utd_sampler = DatasetSampler(target_data, device=device)  # utd - unpaired target data
     else:
         utd_sampler = DatasetSampler(Y_paired_train, device=device)
 
@@ -204,44 +184,39 @@ if __name__ == "__main__":
 
     gt_Y_points = get_GT_points(X_sampler, Y_sampler, otp_sampler, starting_points)
 
-
     batch_size = args.batch_size
-    nz = args.nz #latent dimension
+    nz = args.nz  # latent dimension
 
     netG = MyCGenerator(
-        x_dim = args.x_dim,
-        t_dim = args.t_dim,
-        n_t = args.num_timesteps,
-        out_dim = args.out_dim,
-        z_dim = nz,
-        layers = args.layers_G
+        x_dim=args.x_dim,
+        t_dim=args.t_dim,
+        n_t=args.num_timesteps,
+        out_dim=args.out_dim,
+        z_dim=nz,
+        layers=args.layers_G,
     ).to(device)
 
-    netD = MyCDiscriminator(
-        x_dim = args.x_dim,
-        t_dim = args.t_dim,
-        n_t = args.num_timesteps,
-        layers = args.layers_D
-    ).to(device)
+    netD = MyCDiscriminator(x_dim=args.x_dim, t_dim=args.t_dim, n_t=args.num_timesteps, layers=args.layers_D).to(
+        device
+    )
 
-    optimizerD = optim.Adam(netD.parameters(), lr=args.lr_d, betas = (args.beta1, args.beta2))
-    optimizerG = optim.Adam(netG.parameters(), lr=args.lr_g, betas = (args.beta1, args.beta2))
+    optimizerD = optim.Adam(netD.parameters(), lr=args.lr_d, betas=(args.beta1, args.beta2))
+    optimizerG = optim.Adam(netG.parameters(), lr=args.lr_g, betas=(args.beta1, args.beta2))
 
     schedulerG = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerG, args.num_iterations, eta_min=1e-5)
     schedulerD = torch.optim.lr_scheduler.CosineAnnealingLR(optimizerD, args.num_iterations, eta_min=1e-5)
 
     history = {
-            'D_loss': [],
-            'G_loss': [],
-        }
+        "D_loss": [],
+        "G_loss": [],
+    }
     history = dotdict(history)
 
     OUTPUT_MODEL_PATH = "./checkpoints/models/cgan_16k_full"
     if not os.path.exists(OUTPUT_MODEL_PATH):
         os.makedirs(OUTPUT_MODEL_PATH)
 
-
-    #MAIN CYCLE
+    # MAIN CYCLE
 
     for step in tqdm(range(CONTINUE + 1, MAX_STEPS)):
         #########################
@@ -275,11 +250,11 @@ if __name__ == "__main__":
         # R_1(\phi) regularization
         if args.lazy_reg is None or step % args.lazy_reg == 0:
             grad_real = torch.autograd.grad(
-                outputs=D_real.sum(), inputs=Y_paired, create_graph=True,
+                outputs=D_real.sum(),
+                inputs=Y_paired,
+                create_graph=True,
             )[0]
-            grad_penalty = (
-                grad_real.view(grad_real.size(0), -1).norm(2, dim=1) ** 2
-            ).mean()
+            grad_penalty = (grad_real.view(grad_real.size(0), -1).norm(2, dim=1) ** 2).mean()
 
             grad_penalty = args.r1_gamma / 2 * grad_penalty
             grad_penalty.backward()
@@ -352,9 +327,8 @@ if __name__ == "__main__":
         schedulerG.step()
         schedulerD.step()
 
-        if (step+1) % SAVE_EVERY == 0:
+        if (step + 1) % SAVE_EVERY == 0:
             torch.save(netG.state_dict(), os.path.join(OUTPUT_MODEL_PATH, f"G_{step}.pt"))
 
         gc.collect()
         torch.cuda.empty_cache()
-
