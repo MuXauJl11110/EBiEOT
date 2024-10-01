@@ -1,5 +1,0 @@
-_target_: src.discrete_ot.OTPlanSampler
-method: sinkhorn
-reg: 0.05
-reg_m: 1.0
-normalize_cost: False

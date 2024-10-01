@@ -1,8 +1,0 @@
-mini_batch_size: null
-meta_info: "_"
-n_paired_samples: 50
-m_unpaired_samples: 16384
-begin: 357000
-end: 1000000
-plot_every: 1000
-batch_size: 16384
