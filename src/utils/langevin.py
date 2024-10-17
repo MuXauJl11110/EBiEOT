@@ -1,5 +1,6 @@
 from typing import Callable, Literal
 
+import numpy as np
 import torch
 
 
@@ -47,10 +48,10 @@ def sample_langevin_batch(
     sampling_noise = torch.full((batch_size,), noise, device=y.device)  # [bs]
 
     # statistics
-    r_t = torch.zeros(1.0).to(y.device)
-    cost_r_t = torch.zeros(1.0).to(y.device)
-    score_r_t = torch.zeros(1.0).to(y.device)
-    noise_t = torch.zeros(1.0).to(y.device)
+    r_t = torch.zeros(1).to(y.device)
+    cost_r_t = torch.zeros(1).to(y.device)
+    score_r_t = torch.zeros(1).to(y.device)
+    noise_t = torch.zeros(1).to(y.device)
 
     # langevin iterations
     for _ in range(num_iterations):
@@ -68,7 +69,7 @@ def sample_langevin_batch(
             noise = sampling_noise * torch.sqrt(scaling_factors)[:, None]  # [bs]
 
         # Langevin dynamics
-        y = y + 0.5 * step * score + noise * z_t
+        y = y + 0.5 * step[:, None] * score + noise[:, None] * z_t
 
         # stats calculation
         if compute_stats:
@@ -78,7 +79,7 @@ def sample_langevin_batch(
             noise_t += (noise * torch.norm(z_t, dim=1)).mean()
 
         sampling_step *= decay
-        sampling_noise *= torch.sqrt(decay)
+        sampling_noise *= np.sqrt(decay)
 
         # Project data to images compact
         y = data_projector(y)
@@ -108,9 +109,9 @@ def sample_pseudo_langevin_batch(
     sampling_noise = torch.full((batch_size,), noise, device=y.device)  # [bs]
 
     # statistics
-    r_t = torch.zeros(1.0).to(y.device)
-    cost_r_t = torch.zeros(1.0).to(y.device)
-    score_r_t = torch.zeros(1.0).to(y.device)
+    r_t = torch.zeros(1).to(y.device)
+    cost_r_t = torch.zeros(1).to(y.device)
+    score_r_t = torch.zeros(1).to(y.device)
 
     # langevin iterations
     for _ in range(num_iterations):

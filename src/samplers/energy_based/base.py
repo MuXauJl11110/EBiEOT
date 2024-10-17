@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 
 import torch
+from torch.distributions.distribution import Distribution
 
 
 # TODO: annotate __init__ method
 class SampleBuffer(ABC):
 
-    def __init__(self, noise_gen) -> None:
+    def __init__(self, noise_gen: Distribution) -> None:
         self.noise_gen = noise_gen
 
     @abstractmethod
