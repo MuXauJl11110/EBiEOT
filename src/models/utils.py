@@ -1,8 +1,75 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 import torch
 import torch.nn as nn
+import torchvision
+from torch.func import grad, vmap
 
 from src.utils.energy_based import spectral_norm
+
+
+class CostBase(ABC, nn.Module):
+    def __init__(
+        self,
+        x_dim: int = 2,
+        y_dim: int = 2,
+    ):
+        super(CostBase, self).__init__()
+        self.x_dim = x_dim
+        self.y_dim = y_dim
+        self._grad_y = vmap(grad(self.func, argnums=1))
+        self._func = vmap(self.func)
+
+    @abstractmethod
+    def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
+        pass
+
+    def forward(self, batched_x: torch.Tensor, batched_y: torch.Tensor) -> torch.Tensor:  # [bs]
+        return self._func(batched_x, batched_y)
+
+    def grad_y(self, batched_x: torch.Tensor, batched_y: torch.Tensor) -> torch.Tensor:  # [bs]
+        return self._grad_y(batched_x, batched_y)
+
+
+class MLPCost(CostBase):
+    def __init__(
+        self,
+        x_dim: int = 2,
+        y_dim: int = 2,
+        n_potentials: int = 5,
+        m_potentials: int = 10,
+        epsilon: float = 1.0,
+    ):
+        r"""
+        :param int x_dim: Dimension of X space, defaults to 2
+        :param int y_dim: Dimension of Y space, defaults to 3
+        :param int n_potentials: Number of potentials for approximating dual variable :math:`f(y)=\varepsilon\log\sum_{n=1}^N w_n \mathcal{N}(y\vert a_n, A_n/\varepsilon)`, defaults to 5
+        :param int m_potentials: Number of potentials for approximating plan :math:`c(x, y)=-\varepsilon\log\sum_{m=1}^M v_m(x) \exp(\langle b_m(x), y \rangle) /\varepsilon`, defaults to 10
+        :param float epsilon: Regularization parameter, defaults to 1.0
+        """
+        super(MLPCost, self).__init__(x_dim, y_dim)
+        self.n_potentials = n_potentials
+        self.m_potentials = m_potentials
+        self.register_buffer("epsilon", torch.tensor(epsilon))
+
+        self.log_v_m = nn.Sequential(
+            torchvision.ops.MLP(in_channels=x_dim, hidden_channels=[m_potentials], activation_layer=torch.nn.ReLU),
+            nn.LogSoftmax(dim=-1),
+        )
+        self.b_m = torchvision.ops.MLP(
+            in_channels=x_dim, hidden_channels=[m_potentials * y_dim], activation_layer=torch.nn.ReLU
+        )
+
+    def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # -> [1]
+        log_v_m = self.log_v_m(x)
+        b_m = self.b_m(x).reshape(self.m_potentials, self.y_dim)
+
+        # sum([M x y_dim] * [1 x y_dim], dim=1) = [M]
+        bT_y = torch.sum(b_m * y[None, :], dim=1)
+
+        # sum([[M] + [M], dim=0) = [1]
+        return -self.epsilon * torch.logsumexp(log_v_m + bT_y / self.epsilon, dim=0)
 
 
 class TriangularMLP(nn.Module):
