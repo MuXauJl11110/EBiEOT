@@ -12,7 +12,7 @@ class BaseCost(ABC, nn.Module):
         x_dim: int = 2,
         y_dim: int = 2,
     ):
-        super(BaseCost, self).__init__()
+        super().__init__()
         self.x_dim = x_dim
         self.y_dim = y_dim
         self._grad_y = vmap(grad(self.func, argnums=1))
@@ -44,9 +44,8 @@ class BaseLSECost(BaseCost):
         :param int m_potentials: Number of potentials for approximating plan :math:`c(x, y)=-\varepsilon\log\sum_{m=1}^M v_m(x) \exp(\langle b_m(x), y \rangle) /\varepsilon`, defaults to 10
         :param float epsilon: Regularization parameter, defaults to 1.0
         """
-        super(BaseLSECost, self).__init__(x_dim, y_dim)
+        super().__init__(x_dim, y_dim)
         self.m_potentials = m_potentials
-        self.epsilon = epsilon
         self.register_buffer("epsilon", torch.tensor(epsilon))
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # -> [1]

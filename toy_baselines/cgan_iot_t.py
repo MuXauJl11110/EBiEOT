@@ -9,11 +9,11 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
+import wandb
 from torch import optim
 from tqdm import tqdm
 
-import wandb
-from src.models.models import MyCDiscriminator, MyCGenerator
+from src.auxiliary_models.generative import MyCDiscriminator, MyCGenerator
 from src.samplers.from_dataset import DatasetSampler
 from src.samplers.primary import StandardNormalSampler, SwissRollSampler
 from src.utils.discrete_ot import OTPlanSampler

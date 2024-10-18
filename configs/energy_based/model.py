@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from src.configs.energy_based.projection import ProjectionDataConfig
-from src.configs.energy_based.sampling import LangevinConfig, PseudoLangevinConfig
+from configs.energy_based.projection import ProjectionDataConfig
+from configs.energy_based.sampling import LangevinConfig, PseudoLangevinConfig
 
 
 class EBMConfig(BaseModel):

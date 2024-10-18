@@ -9,10 +9,10 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
+import wandb
 from tqdm import tqdm
 
-import wandb
-from src.models.models import MLPnet
+from src.auxiliary_models.generative import MLPnet
 from src.samplers.from_dataset import DatasetSampler
 from src.samplers.primary import StandardNormalSampler, SwissRollSampler
 from src.utils.discrete_ot import OTPlanSampler

@@ -4,7 +4,7 @@ import os
 import torch
 import torch.nn as nn
 
-from src.configs.energy_based.model import EBMConfig
+from configs.energy_based.model import EBMConfig
 from src.costs.base import BaseCost
 from src.models.base import BaseModel
 from src.samplers.base import Sampler
@@ -19,7 +19,7 @@ class EGEOT(BaseModel):
     """
 
     def __init__(self, potential: nn.Module, cost: BaseCost, sample_buffer: SampleBuffer, config: EBMConfig):
-        super(EGEOT, self).__init__()
+        super().__init__()
         self.potential = potential
         self.cost = cost
         self.sample_buffer = sample_buffer

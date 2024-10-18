@@ -8,11 +8,11 @@ import random
 
 import numpy as np
 import torch
+import wandb
 from nflows.nn import nets as nets
 from tqdm import tqdm
 
-import wandb
-from src.models.models import ConditionalRealNVP
+from src.auxiliary_models.generative import ConditionalRealNVP
 from src.samplers.from_dataset import DatasetSampler
 from src.samplers.primary import StandardNormalSampler, SwissRollSampler
 from src.utils.discrete_ot import OTPlanSampler

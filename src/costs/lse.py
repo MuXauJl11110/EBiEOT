@@ -20,9 +20,8 @@ class MLPCost(BaseLSECost):
         :param int m_potentials: Number of potentials for approximating plan :math:`c(x, y)=-\varepsilon\log\sum_{m=1}^M v_m(x) \exp(\langle b_m(x), y \rangle) /\varepsilon`, defaults to 10
         :param float epsilon: Regularization parameter, defaults to 1.0
         """
-        super(MLPCost, self).__init__(x_dim, y_dim)
+        super().__init__(x_dim, y_dim)
         self.m_potentials = m_potentials
-        self.epsilon = epsilon
         self.register_buffer("epsilon", torch.tensor(epsilon))
 
         self._log_v_m = nn.Sequential(

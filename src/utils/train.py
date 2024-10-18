@@ -1,6 +1,6 @@
 import torch
 
-from src.models.gmm_based import LightGCOT
+from src.models.base import BaseModel
 
 
 def update_average(model_tgt: torch.nn.Module, model_src: torch.nn.Module, beta: float) -> None:
@@ -13,26 +13,14 @@ def update_average(model_tgt: torch.nn.Module, model_src: torch.nn.Module, beta:
 
 
 def compute_loss(
-    model: LightGCOT,
+    model: BaseModel,
     X_unpaired: torch.Tensor,
     Y_unpaired: torch.Tensor,
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
 ) -> float:
-    log_w_n = model.compute_log_w_n()  # [N]
-    a_n = model.compute_a_n()  # [N x y_dim]
-    A_n = model.compute_A_n()  # [N x y_dim]
+    output = model.compute_unpaired_loss(X_unpaired, Y_unpaired)
+    unpaired_loss = output["loss"]
 
-    log_v_m_unpaired = model.compute_log_v_m(X_unpaired)  # [bs x M]
-    b_m_unpaired = model.compute_b_m(X_unpaired)  # [bs x M x y_dim]
-    f_c = model.compute_dual_potential(log_w_n, a_n, A_n, log_v_m_unpaired, b_m_unpaired)
-    f = model.compute_primal_potential(Y_unpaired, log_w_n, a_n, A_n)
-
-    unpaired_loss = -(f + f_c).mean()
-
-    log_v_m_paired = model.compute_log_v_m(X_paired)  # [bs x M]
-    b_m_paired = model.compute_b_m(X_paired)  # [bs x M x y_dim]
-    c = model.compute_cost(Y_paired, log_v_m_paired, b_m_paired)
-
-    paired_loss = c.mean()
+    paired_loss = model.compute_paired_loss(X_paired, Y_paired)
     return (paired_loss + unpaired_loss).item()

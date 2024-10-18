@@ -31,10 +31,9 @@ class GMMEOT(BaseModel):
         :param int sampling_batch_size: Sampling batch size, defaults to 1
         :param float A_diagonal_init: Init of diagonal matrices for dual variable potential, defaults to 0.1
         """
-        super(GMMEOT, self).__init__()
+        super().__init__()
         self.y_dim = y_dim
         self.n_potentials = n_potentials
-        self.epsilon = epsilon
         self.register_buffer("epsilon", torch.tensor(epsilon))
 
         self.cost = cost
