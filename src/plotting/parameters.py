@@ -4,17 +4,18 @@ import torch
 from matplotlib import pyplot as plt
 
 import wandb
-from src.models.light_gcot import LightGCOT
-from src.utils.plotting.distributions import pca
+from src.costs.lse import BaseLSECost
+from src.models.gmm_based import GMMEOT
+from src.plotting.distributions import pca
 
 
-def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Image] | None:
+def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, wandb.Image] | None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
     color = cm.rainbow(np.linspace(0.1, 0.9, 1))
 
-    log_w_n = model.compute_log_w_n()
-    a_n = model.compute_a_n()
-    A_n = model.compute_A_n()
+    log_w_n = model.log_w_n()
+    a_n = model.a_n()
+    A_n = model.A_n()
 
     if A_n.size(1) != 2:
         A_n = pca(A_n, 2)
@@ -54,15 +55,15 @@ def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, wandb.Im
 
 
 def plot_B_parameters(
-    model: LightGCOT, starting_points: torch.Tensor, log: bool = False
+    cost: BaseLSECost, starting_points: torch.Tensor, log: bool = False
 ) -> dict[str, wandb.Image] | None:
     num_subplots = 2
     fig, axes = plt.subplots(1, num_subplots, figsize=(5 * num_subplots, 5), dpi=200)
 
     num_starting_points = len(starting_points)
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
-    log_v_m = model.compute_log_v_m(starting_points)
-    b_m = model.compute_b_m(starting_points)  # [nsp x M x y_dim]
+    log_v_m = cost.log_v_m(starting_points)
+    b_m = cost.b_m(starting_points)  # [nsp x M x y_dim]
 
     log_coeffs = torch.logsumexp(log_v_m, dim=0)
     alphas = 0.1 + torch.exp(log_v_m - log_coeffs).cpu().detach().numpy() * 0.9
@@ -71,13 +72,13 @@ def plot_B_parameters(
     for i, (color, point) in enumerate(zip(colors, starting_points)):
         label = f"{point.cpu().numpy()[:2]}"
 
-        axes[0].scatter(np.arange(model.m_potentials), log_v_m[i], alpha=alphas, label=label, color=color)
+        axes[0].scatter(np.arange(cost.m_potentials), log_v_m[i], alpha=alphas, label=label, color=color)
         axes[0].set_xlabel("M")
         axes[0].set_ylabel("value")
         axes[0].set_title(r"$\log{v_m(x)}$")
         axes[0].grid(zorder=-20)
 
-        if model.y_dim != 2:
+        if cost.y_dim != 2:
             b_m_i = pca(b_m[i], 2).cpu().detach().numpy()
         else:
             b_m_i = b_m[i].cpu().detach().numpy()
@@ -101,7 +102,7 @@ def plot_B_parameters(
 
 
 def plot_Z_parameters(
-    model: LightGCOT,
+    model: GMMEOT,
     starting_points: torch.Tensor,
     X_paired: torch.Tensor | None = None,
     Y_paired: torch.Tensor | None = None,
@@ -119,18 +120,18 @@ def plot_Z_parameters(
     num_starting_points = len(starting_points)  # nsp
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
 
-    log_v_m = model.compute_log_v_m(starting_points)
-    b_m = model.compute_b_m(starting_points)
+    log_v_m = model.cost.log_v_m(starting_points)
+    b_m = model.cost.b_m(starting_points)
 
-    log_w_n = model.compute_log_w_n()
-    a_n = model.compute_a_n()
-    A_n = model.compute_A_n()
+    log_w_n = model.log_w_n()
+    a_n = model.a_n()
+    A_n = model.A_n()
 
     r_nm = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).reshape(
-        num_starting_points, model.n_potentials * model.m_potentials, model.y_dim
+        num_starting_points, model.n_potentials * model.cost.m_potentials, model.y_dim
     )  # [nsp x N * M x y_dim]
-    log_Z_nm = model.compute_log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m).reshape(
-        num_starting_points, model.n_potentials * model.m_potentials
+    log_Z_nm = model.log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m).reshape(
+        num_starting_points, model.n_potentials * model.cost.m_potentials
     )  # [nsp x N * M]
 
     bT_A = b_m[:, None, :, :] * A_n[None, :, None, :]
@@ -164,7 +165,7 @@ def plot_Z_parameters(
         axes[0].grid(zorder=-20)
 
         axes[1].scatter(
-            np.arange(model.n_potentials * model.m_potentials),
+            np.arange(model.n_potentials * model.cost.m_potentials),
             log_Z_nm[i],
             alpha=alpha,
             label=label,
@@ -176,7 +177,7 @@ def plot_Z_parameters(
         axes[1].grid(zorder=-20)
 
         axes[2].scatter(
-            np.arange(model.n_potentials * model.m_potentials),
+            np.arange(model.n_potentials * model.cost.m_potentials),
             bT_A_b[i],
             alpha=alpha,
             label=label,
@@ -188,7 +189,7 @@ def plot_Z_parameters(
         axes[2].grid(zorder=-20)
 
         axes[3].scatter(
-            np.arange(model.n_potentials * model.m_potentials),
+            np.arange(model.n_potentials * model.cost.m_potentials),
             aT_b[i],
             alpha=alpha,
             label=label,
@@ -200,7 +201,7 @@ def plot_Z_parameters(
         axes[3].grid(zorder=-20)
 
         axes[4].scatter(
-            np.arange(model.n_potentials * model.m_potentials),
+            np.arange(model.n_potentials * model.cost.m_potentials),
             correction[i],
             alpha=alpha,
             label=label,
@@ -215,8 +216,8 @@ def plot_Z_parameters(
         num_starting_paired_points = len(X_paired)
         colors_paired = cm.rainbow(np.linspace(0.1, 0.9, num_starting_paired_points))
 
-        log_v_m_cost = model.compute_log_v_m(X_paired)
-        b_m_cost = model.compute_b_m(X_paired)
+        log_v_m_cost = model.cost.log_v_m(X_paired)
+        b_m_cost = model.cost.b_m(X_paired)
         scalar_product_m = (
             torch.sum(b_m_cost * Y_paired[:, None, :], dim=2).cpu().detach().numpy()
         )  # sum([bs x M x y_dim] * [bs x 1 x y_dim], dim=(1, 2)) = [bs x M]
@@ -230,7 +231,7 @@ def plot_Z_parameters(
 
             alpha = alphas[i]
             axes[5].scatter(
-                np.arange(model.m_potentials),
+                np.arange(model.cost.m_potentials),
                 log_v_m_cost[i],
                 alpha=alpha,
                 label=label,
@@ -242,7 +243,7 @@ def plot_Z_parameters(
             axes[5].grid(zorder=-20)
 
             axes[6].scatter(
-                np.arange(model.m_potentials),
+                np.arange(model.cost.m_potentials),
                 scalar_product_m[i],
                 alpha=alpha,
                 label=label,
@@ -254,7 +255,7 @@ def plot_Z_parameters(
             axes[6].grid(zorder=-20)
 
             axes[7].scatter(
-                np.arange(model.m_potentials),
+                np.arange(model.cost.m_potentials),
                 -scalar_product_m[i] / model.epsilon.cpu().detach().numpy() - log_v_m_cost[i],
                 alpha=alpha,
                 label=label,

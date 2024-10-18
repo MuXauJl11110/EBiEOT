@@ -4,18 +4,19 @@ import random
 import matplotlib.cm as cm
 import numpy as np
 import torch
+import torch.nn as nn
 from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
 
 import wandb
-from src.models.light_gcot import LightGCOT
+from src.models.base import BaseModel
 from src.samplers.primary import GridGaussiansSampler, Sampler
 
 
 def plot_gaussians(
-    model: LightGCOT,
+    model: nn.Module,
     X_sampler: GridGaussiansSampler,
     Y_sampler: GridGaussiansSampler,
     X_paired: torch.Tensor,
@@ -85,7 +86,7 @@ def plot_gaussians(
 
 
 def plot_PCA(
-    model: LightGCOT,
+    model: nn.Module,
     source_data: torch.Tensor,
     target_data: torch.Tensor,
     paired_source_data: torch.Tensor,

@@ -1,10 +1,31 @@
 import random
+from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
 from torch.distributions.distribution import Distribution
 
-from src.samplers.energy_based.base import SampleBuffer
+
+class SampleBuffer(ABC):
+
+    def __init__(self, noise_gen: Distribution) -> None:
+        self.noise_gen = noise_gen
+
+    @abstractmethod
+    def push(self, Xs: torch.Tensor, samples: torch.Tensor, ids: list[int] | None) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get(self, n_samples: int):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __len__(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def __call__(self, Xs: torch.Tensor):
+        raise NotImplementedError()
 
 
 # TODO: which type is ids?

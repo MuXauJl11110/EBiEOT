@@ -36,15 +36,13 @@ def evaluating(net: torch.nn.Module):
             net.train()
 
 
-# TODO: add annotation
 class SpectralNorm:
-
-    def __init__(self, name, bound=False, n_iters=1):
+    def __init__(self, name: str, bound: bool = False, n_iters: int = 1):
         self.name = name
         self.bound = bound
         self.n_iters = n_iters
 
-    def compute_weight(self, module):
+    def compute_weight(self, module: nn.Module):
         weight = getattr(module, self.name + "_orig")
         u = getattr(module, self.name + "_u")
         size = weight.size()
@@ -68,7 +66,7 @@ class SpectralNorm:
         return weight_sn, u
 
     @staticmethod
-    def apply(module, name, bound, n_iters):
+    def apply(module: nn.Module, name: str, bound, n_iters: int):
         fn = SpectralNorm(name, bound, n_iters)
 
         weight = getattr(module, name)
@@ -83,14 +81,15 @@ class SpectralNorm:
 
         return fn
 
-    def __call__(self, module, input):
+    def __call__(self, module: nn.Module):
         weight_sn, u = self.compute_weight(module)
         setattr(module, self.name, weight_sn)
         setattr(module, self.name + "_u", u)
 
 
-# TODO: add annotation
-def spectral_norm(module, init=True, zero_bias=True, std=1, bound=False, n_iters=1):
+def spectral_norm(
+    module: nn.Module, init: bool = True, zero_bias: bool = True, std: float = 1, bound: bool = False, n_iters: int = 1
+):
     if init:
         nn.init.normal_(module.weight, 0, std)
 

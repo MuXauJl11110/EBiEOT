@@ -3,14 +3,14 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from src.models.light_gcot import LightGCOT
+from src.models.gmm_based import GMMEOT
 
 
-def plot_A_parameters(model: LightGCOT, log: bool = False) -> dict[str, go.Figure] | None:
+def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, go.Figure] | None:
     # Compute data for plots
-    log_w_n = model.compute_log_w_n()
-    a_n = model.compute_a_n()
-    A_n = model.compute_A_n()
+    log_w_n = model.log_w_n()
+    a_n = model.a_n()
+    A_n = model.A_n()
 
     # Initialize figure with subplots
     fig = make_subplots(rows=1, cols=3, subplot_titles=(r"$\log{w_n}$", r"$a_n$", r"$A_n$"))

@@ -1,6 +1,6 @@
 import torch
 
-from src.models.light_gcot import LightGCOT
+from src.models.gmm_based import LightGCOT
 
 
 def update_average(model_tgt: torch.nn.Module, model_src: torch.nn.Module, beta: float) -> None:
