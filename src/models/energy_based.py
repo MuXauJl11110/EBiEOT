@@ -2,69 +2,67 @@ import inspect
 import os
 
 import torch
-import torch.nn as nn
 
 from configs.energy_based.model import EBMConfig
+from configs.energy_based.sampling import LangevinConfig, PseudoLangevinConfig
 from src.costs.base import BaseCost
-from src.models.base import BaseModel
+from src.models.base import BaseGenerativeModel
+from src.potentials.base import BasePotential
 from src.samplers.base import Sampler
+from src.samplers.energy_based.langevin import (
+    sample_langevin_batch,
+    sample_pseudo_langevin_batch,
+)
 from src.samplers.energy_based.sample_buffer import SampleBuffer
-from src.utils.energy_based import computePotGrad, evaluating
+from src.utils.energy_based import evaluating
 
 
 # The code of this class is based on https://github.com/PetrMokrov/Energy-guided-Entropic-OT/tree/main
-class EGEOT(BaseModel):
+class EGEOT(BaseGenerativeModel):
     """
     Energy-guided entropic optimal transport (EOT) with general cost function class
     """
 
-    def __init__(self, potential: nn.Module, cost: BaseCost, sample_buffer: SampleBuffer, config: EBMConfig):
+    def __init__(self, potential: BasePotential, cost: BaseCost, sample_buffer: SampleBuffer, config: EBMConfig):
         super().__init__()
         self.potential = potential
         self.cost = cost
         self.sample_buffer = sample_buffer
         self.config = config
 
-    def cond_score(
-        self, y: torch.Tensor, x: torch.Tensor, ret_stats: bool = False
-    ) -> (
-        tuple[torch.Tensor, torch.Tensor, torch.Tensor] | torch.Tensor
-    ):  # -> ([bs x y_dim], [bs x y_dim], [bs x y_dim]) | [bs x y_dim]
-        with torch.enable_grad():
-            y.requires_grad_(True)
-            proto_s = self.potential.forward(y)
-            score = computePotGrad(y, proto_s)
-            assert score.shape == y.shape  # [bs x y_dim]
+    def energy_function(self, batched_x: torch.Tensor, batched_y: torch.Tensor) -> torch.Tensor:  # -> [bs]
+        return (self.cost(batched_x, batched_y) - self.potential(batched_y)) / self.config.epsilon
 
-        cost_coeff = (1 / self.config.epsilon) * self.config.sampling.cost_coefficient / self.config.sampling.step_size
-        cost_part = self.cost.grad_y(x, y) * cost_coeff  # [bs x y_dim]
-        score_part = score * self.config.sampling.score_coefficient  # [bs x y_dim]
-
-        if not ret_stats:
-            return score_part - cost_part
-        return score_part - cost_part, cost_part, score_part
+    def energy_function_grad_y(
+        self, batched_x: torch.Tensor, batched_y: torch.Tensor, stats: bool = False
+    ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:  # -> [bs]
+        cost_part = self.cost.grad_y(batched_x, batched_y) / self.config.epsilon
+        potential_part = self.potential.grad_y(batched_y) / self.config.epsilon
+        if stats:
+            return cost_part - potential_part, cost_part, potential_part
+        return cost_part - potential_part
 
     def get_samples_energy(
         self,
-        x_samples: torch.Tensor,
-        init_y_samples: torch.Tensor,
+        batched_x: torch.Tensor,
+        batched_init_y: torch.Tensor,
         compute_stats: bool = False,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | torch.Tensor:
-
-        def score_function(y, ret_stats=False):
-            return self.cond_score(y, x_samples, ret_stats=ret_stats)
-
-        sample_function = self.config.sampling.function
+        if isinstance(self.config.sampling, LangevinConfig):
+            sample_function = sample_langevin_batch
+        elif isinstance(self.config.sampling, PseudoLangevinConfig):
+            sample_function = sample_pseudo_langevin_batch
+        else:
+            raise ValueError("Unknown sampling!")
         signature = inspect.signature(sample_function)
         valid_args = signature.parameters
         filtered_args = {k: v for k, v in iter(self.config.sampling) if k in valid_args}
 
+        def score_function(y: torch.Tensor, stats: bool = False):
+            return self.energy_function_grad_y(batched_x, y, stats=stats)
+
         return sample_function(
-            score_function=score_function,
-            y=init_y_samples,
-            data_projector=self.config.projection.data_projector,
-            compute_stats=compute_stats,
-            **filtered_args,
+            score_function=score_function, y=batched_init_y, compute_stats=compute_stats, **filtered_args
         )
 
     # TODO: why this function is so universal for sampling?
@@ -111,6 +109,9 @@ class EGEOT(BaseModel):
                 return output_samples
 
     def compute_unpaired_loss(self, X_unpaired: torch.Tensor, Y_unpaired: torch.Tensor) -> dict[str, torch.Tensor]:
+        """
+        You can find details about training at https://uvadlc-notebooks.readthedocs.io/en/latest/tutorial_notebooks/tutorial8/Deep_Energy_Models.html.
+        """
         # slightly noise the data
         if self.config.reference_data_noise_sigma > 0.0:
             Y_unpaired += self.config.reference_data_noise_sigma * torch.randn_like(Y_unpaired)

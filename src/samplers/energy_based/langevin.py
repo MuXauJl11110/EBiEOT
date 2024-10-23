@@ -56,7 +56,7 @@ def sample_langevin_batch(
     # langevin iterations
     for _ in range(num_iterations):
         z_t = torch.randn_like(y)
-        score, cost_part, score_part = score_function(y, ret_stats=True)
+        score, cost_part, score_part = score_function(y, stats=True)
 
         # adjusting discretization step
         if thresh is None:
@@ -116,7 +116,7 @@ def sample_pseudo_langevin_batch(
     # langevin iterations
     for _ in range(num_iterations):
         y += sampling_noise
-        score, cost_part, score_part = score_function(y, ret_stats=True)
+        score, cost_part, score_part = score_function(y, stats=True)
 
         if grad_proj_type == "none":
             pass

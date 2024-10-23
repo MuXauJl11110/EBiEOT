@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from src.utils.energy_based import spectral_norm
@@ -27,7 +28,7 @@ class FullyConnectedMLP(nn.Module):
         model.append(_SN(nn.Linear(hiddens[-1], output_dim)))
         self.net = nn.Sequential(*model)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size = x.shape[0]
         x = x.view(batch_size, -1)
         return self.net(x).view(batch_size, self.output_dim)

@@ -5,13 +5,12 @@ import matplotlib.cm as cm
 import numpy as np
 import torch
 import torch.nn as nn
+import wandb
 from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
 
-import wandb
-from src.models.base import BaseModel
 from src.samplers.primary import GridGaussiansSampler, Sampler
 
 

@@ -1,3 +1,5 @@
+from typing import Callable
+
 from pydantic import BaseModel
 
 from configs.energy_based.projection import ProjectionDataConfig
