@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torchvision
+from torchvision.ops import MLP
 
 from src.costs.base import BaseLSECost
 
@@ -29,14 +29,10 @@ class MLPLSECost(BaseLSECost):
         self.register_buffer("epsilon", torch.tensor(epsilon))
 
         self._log_v_m = nn.Sequential(
-            torchvision.ops.MLP(
-                in_channels=x_dim, hidden_channels=log_v_m_hidden_channels, activation_layer=log_v_m_activation_layer
-            ),
+            MLP(in_channels=x_dim, hidden_channels=log_v_m_hidden_channels, activation_layer=log_v_m_activation_layer),
             nn.LogSoftmax(dim=-1),
         )
-        self._b_m = torchvision.ops.MLP(
-            in_channels=x_dim, hidden_channels=b_m_hidden_channels, activation_layer=b_m_activation_layer
-        )
+        self._b_m = MLP(in_channels=x_dim, hidden_channels=b_m_hidden_channels, activation_layer=b_m_activation_layer)
 
     def compute_log_v_m(self, x: torch.Tensor) -> torch.Tensor:  # [M]
         return self._log_v_m(x)
