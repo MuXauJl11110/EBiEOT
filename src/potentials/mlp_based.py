@@ -1,15 +1,24 @@
+from typing import Callable
+
 import torch
 import torch.nn as nn
-from torchvision.ops import MLP
 
+from src.auxiliary_models.mlp_based import FullyConnectedMLP
 from src.potentials.base import BasePotential
 
 
 class MLPPotential(BasePotential):
-    def __init__(self, y_dim: int, hidden_channels: list[int], activation_layer: nn.Module = nn.ReLU):
+    def __init__(
+        self,
+        y_dim: int,
+        hidden_layers: list[int],
+        activation_function: Callable[[], nn.Module],
+    ):
         super().__init__(y_dim)
 
-        self.net = MLP(in_channels=y_dim, hidden_channels=hidden_channels, activation_layer=activation_layer)
+        self.net = FullyConnectedMLP(
+            input_dim=y_dim, hidden_layers=hidden_layers, output_dim=1, activation_function=activation_function
+        )
 
     def func(self, y: torch.Tensor) -> torch.Tensor:  # -> [1]
-        return self.net(y).squeeze()
+        return self.net.func(y)

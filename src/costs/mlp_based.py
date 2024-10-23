@@ -1,7 +1,9 @@
+from typing import Callable
+
 import torch
 import torch.nn as nn
-from torchvision.ops import MLP
 
+from src.auxiliary_models.mlp_based import FullyConnectedMLP
 from src.costs.base import BaseCost
 
 
@@ -9,8 +11,8 @@ from src.costs.base import BaseCost
 class MLPCost(BaseCost):
     def __init__(
         self,
-        hidden_channels: list[int],
-        activation_layer: nn.Module,
+        hidden_layers: list[int],
+        activation_function: Callable[[], nn.Module],
         x_dim: int = 2,
         y_dim: int = 2,
     ):
@@ -20,7 +22,9 @@ class MLPCost(BaseCost):
         """
         super().__init__(x_dim, y_dim)
 
-        self.cost = MLP(in_channels=x_dim, hidden_channels=hidden_channels, activation_layer=activation_layer)
+        self.net = FullyConnectedMLP(
+            input_dim=x_dim + y_dim, hidden_layers=hidden_layers, output_dim=1, activation_function=activation_function
+        )
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
-        return self.cost(torch.stack([x, y])).squeeze()
+        return self.net.func(torch.cat([x, y]))

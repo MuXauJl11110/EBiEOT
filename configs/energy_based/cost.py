@@ -1,9 +1,8 @@
 from typing import Callable
 
 import torch.nn as nn
-from pydantic import model_validator
-
 from configs.base.cost import BaseCostConfig
+from pydantic import model_validator
 
 
 class MLPLSECostConfig(BaseCostConfig):
@@ -22,5 +21,5 @@ class MLPLSECostConfig(BaseCostConfig):
 
 
 class MLPCostConfig(BaseCostConfig):
-    hidden_channels: list[int] = [256, 256, 1]
-    activation_layer: Callable[[], nn.Module] = lambda: nn.LeakyReLU(0.2)
+    hidden_layers: list[int] = [256, 256, 1]
+    activation_function: Callable[[], nn.Module] = lambda: nn.LeakyReLU(0.2)
