@@ -27,6 +27,7 @@ def clip_by_norm(x: torch.Tensor, norm_thresh: float) -> torch.Tensor:
     return x * scaling_factors
 
 
+# TODO: rewrite returning parameters
 def sample_langevin_batch(
     score_function: Callable[[torch.Tensor, bool], tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
     y: torch.Tensor,

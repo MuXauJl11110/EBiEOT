@@ -28,3 +28,4 @@ class MLPCost(BaseCost):
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
         return self.net.func(torch.cat([x, y]))
+        # return torch.sum((x - y) ** 2)

@@ -1,5 +1,6 @@
 from typing import Literal
 
+from configs.energy_based.projection import ProjectionDataConfig
 from pydantic import BaseModel, model_validator
 
 
@@ -11,6 +12,7 @@ class LangevinConfig(BaseModel):
     decay: float = 1.0
     score_coefficient: float = 1.0
     cost_coefficient: float | None = None
+    projection: ProjectionDataConfig = ProjectionDataConfig()
 
     # Init cost_coefficients = sampling_noise^2
     @model_validator(mode="after")

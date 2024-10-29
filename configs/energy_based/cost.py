@@ -6,7 +6,7 @@ from pydantic import model_validator
 
 
 class MLPLSECostConfig(BaseCostConfig):
-    m_potentials: int = 25
+    m_potentials: int = 2
     epsilon: float = 1.0
 
     log_v_m_hidden_channels: list[int] = [128, 128]
@@ -21,5 +21,5 @@ class MLPLSECostConfig(BaseCostConfig):
 
 
 class MLPCostConfig(BaseCostConfig):
-    hidden_layers: list[int] = [256, 256, 1]
+    hidden_layers: list[int] = [256, 256, 256]
     activation_function: Callable[[], nn.Module] = lambda: nn.LeakyReLU(0.2)
