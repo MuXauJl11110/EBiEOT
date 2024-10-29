@@ -39,29 +39,33 @@ def run_notebook_in_parallel(max_processes: int, notebook_name: str, param_grid:
         processes_list: list[tuple] = []
 
         for params in ParameterGrid(param_grid):
-            if params["N_POTENTIALS"] >= params["M_POTENTIALS"]:
-                output_name = "_".join(f"{key}={val}" for (key, val) in params.items())
-                processes_list.append((notebook_name, f"./ploomber_notebooks/{output_name}.ipynb", params))
+            output_name = "_".join(
+                f"{key}={val}" for (key, val) in params.items() if key not in {"SAMPLING_NUM_ITER", "M_POTENTIALS"}
+            )
+            processes_list.append((notebook_name, f"./papermill_notebooks/{output_name}.ipynb", params))
         results = pool.starmap(run_notebook, processes_list)
 
     return results
 
 
 if __name__ == "__main__":
-    max_processes = 4
-    notebook_name = "./notebooks/GMMEOT_swiss_roll.ipynb"
+    max_processes = 2
+    notebook_name = "./notebooks/EgEOT_swiss_roll.ipynb"
+    # TODO: add config for hidden layers for cost
     param_grid = {
-        "N_POTENTIALS": [50, 100],
-        "M_POTENTIALS": [10],
-        "M_X_UNPAIRED_SAMPLES": [0, 1024],
-        "N_Y_UNPAIRED_SAMPLES": [0, 1024],
-        "L_PAIRED_SAMPLES": [128],
-        "D_LR_PAIRED": [3e-4],
-        "D_LR_UNPAIRED": [1e-3],
-        "MAX_STEPS": [100000],
-        "EXP_COST": ["MLP_deep"],
+        "M_POTENTIALS": [2],
+        # "LOG_V_M_HIDDEN_CHANNELS": [[128, 128], [256]],
+        # "B_M_HIDDEN_CHANNELS": [[128, 128], [256, 256]],
+        "HIDDEN_LAYERS": [[512], [128, 128], [256, 256]],
+        "P_XY_PAIRED_SAMPLES": [4096],
+        "Q_X_UNPAIRED_SAMPLES": [4096],
+        "R_Y_UNPAIRED_SAMPLES": [4096],
+        "LR_PAIRED": [2e-4],
+        "LR_UNPAIRED": [2e-4],
+        "SAMPLING_NUM_ITER": [100],
+        "MAX_STEPS": [3000],
+        "COST_FUNCTION": ["MLP"],
     }
-
     # Run the notebooks in parallel
     results = run_notebook_in_parallel(max_processes, notebook_name, param_grid)
 

@@ -19,8 +19,9 @@ def compute_loss(
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
 ) -> float:
-    output = model.compute_unpaired_loss(X_unpaired, Y_unpaired)
-    unpaired_loss = output["loss"]
+    output_unpaired = model.compute_unpaired_loss(X_unpaired, Y_unpaired)
+    unpaired_loss = output_unpaired["loss"]
 
-    paired_loss = model.compute_paired_loss(X_paired, Y_paired)
+    output_paired = model.compute_paired_loss(X_paired, Y_paired)
+    paired_loss = output_paired["loss"]
     return (paired_loss + unpaired_loss).item()

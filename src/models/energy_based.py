@@ -3,8 +3,8 @@ import os
 
 import torch
 import torch.nn as nn
-
 from configs.energy_based.model import EBMConfig
+
 from src.costs.base import BaseCost
 from src.models.base import BaseModel
 from src.samplers.base import Sampler

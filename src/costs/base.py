@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 import torch
 import torch.nn as nn
-import torchvision
 from torch.func import grad, vmap
 
 
@@ -47,10 +46,12 @@ class BaseLSECost(BaseCost):
         super().__init__(x_dim, y_dim)
         self.m_potentials = m_potentials
         self.register_buffer("epsilon", torch.tensor(epsilon))
+        self.b_m = vmap(self.compute_b_m)  # batched version of self.compute_b_m
+        self.log_v_m = vmap(self.compute_log_v_m)  # batched version of self.compute_log_v_m
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # -> [1]
-        log_v_m = self.log_v_m(x)
-        b_m = self.b_m(x)
+        log_v_m = self.compute_log_v_m(x)
+        b_m = self.compute_b_m(x)
 
         # sum([M x y_dim] * [1 x y_dim], dim=1) = [M]
         bT_y = torch.sum(b_m * y[None, :], dim=1)
@@ -59,9 +60,9 @@ class BaseLSECost(BaseCost):
         return -self.epsilon * torch.logsumexp(log_v_m + bT_y / self.epsilon, dim=0)
 
     @abstractmethod
-    def b_m(self, x: torch.Tensor) -> torch.Tensor:  # -> [M x y_dim]
+    def compute_b_m(self, x: torch.Tensor) -> torch.Tensor:  # -> [M x y_dim]
         pass
 
     @abstractmethod
-    def log_v_m(self, x: torch.Tensor) -> torch.Tensor:  # -> [M]
+    def compute_log_v_m(self, x: torch.Tensor) -> torch.Tensor:  # -> [M]
         pass

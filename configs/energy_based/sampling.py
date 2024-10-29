@@ -13,7 +13,7 @@ class LangevinConfig(BaseModel):
     thresh: float | None = None
     step_size: float = 0.05
     noise: float = 0.05
-    num_iterations: int = 500
+    num_iterations: int = 100
     decay: float = 1.0
     score_coefficient: float = 1.0
     cost_coefficient: float | None = None
