@@ -27,6 +27,7 @@ def clip_by_norm(x: torch.Tensor, norm_thresh: float) -> torch.Tensor:
     return x * scaling_factors
 
 
+# TODO: rewrite returning parameters
 def sample_langevin_batch(
     score_function: Callable[[torch.Tensor, bool], tuple[torch.Tensor, torch.Tensor, torch.Tensor]],
     y: torch.Tensor,
@@ -56,7 +57,7 @@ def sample_langevin_batch(
     # langevin iterations
     for _ in range(num_iterations):
         z_t = torch.randn_like(y)
-        score, cost_part, score_part = score_function(y, ret_stats=True)
+        score, cost_part, score_part = score_function(y, stats=True)
 
         # adjusting discretization step
         if thresh is None:
@@ -116,7 +117,7 @@ def sample_pseudo_langevin_batch(
     # langevin iterations
     for _ in range(num_iterations):
         y += sampling_noise
-        score, cost_part, score_part = score_function(y, ret_stats=True)
+        score, cost_part, score_part = score_function(y, stats=True)
 
         if grad_proj_type == "none":
             pass

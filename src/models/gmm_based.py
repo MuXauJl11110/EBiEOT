@@ -6,10 +6,10 @@ from torch.distributions.mixture_same_family import MixtureSameFamily
 from torch.distributions.normal import Normal
 
 from src.costs.lse import BaseLSECost
-from src.models.base import BaseModel
+from src.models.base import BaseGenerativeModel
 
 
-class GMMEOT(BaseModel):
+class GMMEOT(BaseGenerativeModel):
     """
     GMM-guided entropic optimal transport (EOT) with general cost function class
     """

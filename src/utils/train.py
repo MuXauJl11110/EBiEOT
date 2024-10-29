@@ -1,6 +1,6 @@
 import torch
 
-from src.models.base import BaseModel
+from src.models.base import BaseGenerativeModel
 
 
 def update_average(model_tgt: torch.nn.Module, model_src: torch.nn.Module, beta: float) -> None:
@@ -13,7 +13,7 @@ def update_average(model_tgt: torch.nn.Module, model_src: torch.nn.Module, beta:
 
 
 def compute_loss(
-    model: BaseModel,
+    model: BaseGenerativeModel,
     X_unpaired: torch.Tensor,
     Y_unpaired: torch.Tensor,
     X_paired: torch.Tensor,

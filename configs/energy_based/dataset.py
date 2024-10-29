@@ -2,7 +2,7 @@ from configs.base.dataset import BaseDatasetConfig, BaseMiniBatchConfig
 
 
 class DatasetConfig(BaseDatasetConfig):
-    P_XY_paired: int = 128
+    P_XY_paired: int = 1024
     Q_X_unpaired: int = 1024
     R_Y_unpaired: int = 1024
 

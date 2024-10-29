@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-class BaseModel(ABC, nn.Module):
+class BaseGenerativeModel(ABC, nn.Module):
     @abstractmethod
     def forward(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs]
         pass

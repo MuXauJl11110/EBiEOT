@@ -28,11 +28,6 @@ class MLPLSECost(BaseLSECost):
         self.m_potentials = m_potentials
         self.register_buffer("epsilon", torch.tensor(epsilon))
 
-        # self._log_v_m = nn.Sequential(
-        #     MLP(in_channels=x_dim, hidden_channels=log_v_m_hidden_channels, activation_layer=log_v_m_activation_layer),
-        #     nn.LogSoftmax(dim=-1),
-        # )
-        # self._b_m = MLP(in_channels=x_dim, hidden_channels=b_m_hidden_channels, activation_layer=b_m_activation_layer)
         self._log_v_m = nn.Sequential(
             FullyConnectedMLP(
                 input_dim=x_dim,
@@ -50,9 +45,7 @@ class MLPLSECost(BaseLSECost):
         )
 
     def compute_log_v_m(self, x: torch.Tensor) -> torch.Tensor:  # [M]
-        # return self._log_v_m(x)
         return self._log_v_m(x[None, :]).squeeze()
 
     def compute_b_m(self, x: torch.Tensor) -> torch.Tensor:  # [M x y_dim]
-        # return self._b_m(x).reshape(self.m_potentials, self.y_dim)
         return self._b_m(x[None, :]).reshape(self.m_potentials, self.y_dim).squeeze()

@@ -12,13 +12,6 @@ class MLPLSECostConfig(BaseCostConfig):
     log_v_m_hidden_channels: list[int] = [128, 128]
     b_m_hidden_channels: list[int] = [256, 256]
 
-    # @model_validator(mode="after")
-    # def append_hidden_channels(self):
-    #     self.log_v_m_hidden_channels.append(self.m_potentials)
-    #     self.b_m_hidden_channels.append(self.m_potentials * self.y_dim)
-
-    #     return self
-
 
 class MLPCostConfig(BaseCostConfig):
     hidden_layers: list[int] = [256]

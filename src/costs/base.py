@@ -24,6 +24,7 @@ class BaseCost(ABC, nn.Module):
     def forward(self, batched_x: torch.Tensor, batched_y: torch.Tensor) -> torch.Tensor:  # [bs]
         return self._func(batched_x, batched_y)
 
+    # WARNING: returns torch.Tensor with requires_grad=True if context manager torch.no_grad() was not used.
     def grad_y(self, batched_x: torch.Tensor, batched_y: torch.Tensor) -> torch.Tensor:  # [bs]
         return self._grad_y(batched_x, batched_y)
 

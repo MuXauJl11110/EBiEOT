@@ -35,10 +35,10 @@ class FullyConnectedMLP(nn.Module):
         model.append(_SN(nn.Linear(hidden_layers[-1], output_dim)))
         self.net = nn.Sequential(*model)
 
-    def forward(self, x):
-        batch_size = x.shape[0]
-        x = x.view(batch_size, -1)
-        return self.net(x).view(batch_size, self.output_dim)
+    def forward(self, batched_x: torch.Tensor) -> torch.Tensor:  # -> [bs x output_dim]
+        batch_size = batched_x.shape[0]
+        batched_x = batched_x.view(batch_size, -1)
+        return self.net(batched_x).view(batch_size, self.output_dim)
 
     def func(self, x: torch.Tensor) -> torch.Tensor:  # -> [1]
         return self.net(x).squeeze()
