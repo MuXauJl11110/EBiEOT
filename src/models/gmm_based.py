@@ -18,10 +18,10 @@ class GMMEOT(BaseGenerativeModel):
         self,
         y_dim: int,
         n_potentials: int,
-        epsilon: float,
         cost: BaseLSECost,
+        epsilon: float = 1,
         sampling_batch_size: int = 128,
-        A_diagonal_init: float | None = None,
+        A_diagonal_init: float | None = 0.1,
     ):
         r"""
         :param int y_dim: Dimension of Y space
@@ -89,6 +89,8 @@ class GMMEOT(BaseGenerativeModel):
             comp = Independent(Normal(loc=a_n, scale=torch.sqrt(self.epsilon * A_n)), 1)  # [N x y_dim]
             gmm = MixtureSameFamily(mix, comp)
             return self.epsilon * gmm.log_prob(batched_y)  # [bs]
+        else:
+            raise NotImplementedError("Other options are not implemented yet!")
 
     def f_c(
         self,
@@ -118,27 +120,7 @@ class GMMEOT(BaseGenerativeModel):
         A_n = self.A_n()
         for i in range(num_sampling_iterations):
             sub_batch_x = batched_x[sampling_batch_size * i : sampling_batch_size * (i + 1)]
-
-            b_m = self.cost.b_m(sub_batch_x)  # [bs x M x y_dim]
-            log_v_m = self.cost.log_v_m(sub_batch_x)  # [bs x M]
-
-            log_Z_nm = self.log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)  # [bs x N x M]
-
-            logits = log_Z_nm.reshape(sub_batch_x.shape[0], self.n_potentials * self.cost.m_potentials)
-            if self.A_diagonal_init is not None:
-                scale = (
-                    torch.sqrt(self.epsilon * A_n)[None, :, None, :]
-                    .repeat(sub_batch_x.shape[0], 1, self.cost.m_potentials, 1)
-                    .reshape(sub_batch_x.shape[0], self.n_potentials * self.cost.m_potentials, self.y_dim)
-                )
-                loc = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).reshape(
-                    sub_batch_x.shape[0], self.n_potentials * self.cost.m_potentials, self.y_dim
-                )  # view([1 x N x 1 x y_dim] + [1 x N x 1 x y_dim] * [bs x 1 x M x y_dim] = [bs x N x M x y_dim]) = [bs x N * M]
-                mix = Categorical(logits=logits)
-                comp = Independent(Normal(loc=loc, scale=scale), 1)
-                gmm = MixtureSameFamily(mix, comp)
-            else:
-                raise NotImplementedError("Other options are not implemented yet!")
+            gmm = self.get_conditional_distribution(sub_batch_x, log_w_n, a_n, A_n)
 
             samples.append(gmm.sample())
 
@@ -146,10 +128,40 @@ class GMMEOT(BaseGenerativeModel):
 
         return samples
 
-    def compute_paired_loss(self, X_paired: torch.Tensor, Y_paired: torch.Tensor) -> torch.Tensor:
+    def get_conditional_distribution(
+        self,
+        batched_x: torch.Tensor,
+        log_w_n: torch.Tensor,
+        a_n: torch.Tensor,
+        A_n: torch.Tensor,
+    ) -> MixtureSameFamily:
+        b_m = self.cost.b_m(batched_x)  # [bs x M x y_dim]
+        log_v_m = self.cost.log_v_m(batched_x)  # [bs x M]
+
+        log_Z_nm = self.log_Z_nm(log_w_n, a_n, A_n, log_v_m, b_m)  # [bs x N x M]
+
+        logits = log_Z_nm.reshape(batched_x.shape[0], self.n_potentials * self.cost.m_potentials)
+        if self.A_diagonal_init is not None:
+            scale = (
+                torch.sqrt(self.epsilon * A_n)[None, :, None, :]
+                .repeat(batched_x.shape[0], 1, self.cost.m_potentials, 1)
+                .reshape(batched_x.shape[0], self.n_potentials * self.cost.m_potentials, self.y_dim)
+            )
+            loc = (a_n[None, :, None, :] + A_n[None, :, None, :] * b_m[:, None, :, :]).reshape(
+                batched_x.shape[0], self.n_potentials * self.cost.m_potentials, self.y_dim
+            )  # view([1 x N x 1 x y_dim] + [1 x N x 1 x y_dim] * [bs x 1 x M x y_dim] = [bs x N x M x y_dim]) = [bs x N * M]
+            mix = Categorical(logits=logits)
+            comp = Independent(Normal(loc=loc, scale=scale), 1)
+            gmm = MixtureSameFamily(mix, comp)
+        else:
+            raise NotImplementedError("Other options are not implemented yet!")
+
+        return gmm
+
+    def compute_paired_loss(self, X_paired: torch.Tensor, Y_paired: torch.Tensor) -> dict[str, torch.Tensor]:
         c = self.cost(X_paired, Y_paired)
 
-        return c.mean()
+        return {"loss": c.mean()}
 
     def compute_unpaired_loss(self, X_unpaired: torch.Tensor, Y_unpaired: torch.Tensor) -> dict[str, torch.Tensor]:
         log_v_m = self.cost.log_v_m(X_unpaired)  # [bs x M]
@@ -162,4 +174,4 @@ class GMMEOT(BaseGenerativeModel):
         f_c = self.f_c(log_w_n, a_n, A_n, log_v_m, b_m)
         f = self.f(Y_unpaired, log_w_n, a_n, A_n)
 
-        return {"log_w_n": log_w_n, "a_n": a_n, "A_n": A_n, "loss": -(f_c + f).mean()}
+        return {"log_w_n": log_w_n, "a_n": a_n, "A_n": A_n, "f_c": f_c, "f": f, "loss": -(f_c + f).mean()}

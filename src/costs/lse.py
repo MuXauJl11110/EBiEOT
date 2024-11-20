@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torchvision
 
 from src.auxiliary_models.mlp_based import FullyConnectedMLP
 from src.costs.base import BaseLSECost
@@ -29,20 +30,32 @@ class MLPLSECost(BaseLSECost):
         self.register_buffer("epsilon", torch.tensor(epsilon))
 
         self._log_v_m = nn.Sequential(
-            FullyConnectedMLP(
-                input_dim=x_dim,
-                hidden_layers=log_v_m_hidden_channels,
-                output_dim=m_potentials,
-                activation_function=log_v_m_activation_layer,
+            torchvision.ops.MLP(
+                in_channels=x_dim, hidden_channels=log_v_m_hidden_channels, activation_layer=torch.nn.ReLU
             ),
             nn.LogSoftmax(dim=-1),
         )
-        self._b_m = FullyConnectedMLP(
-            input_dim=x_dim,
-            hidden_layers=b_m_hidden_channels,
-            output_dim=m_potentials * y_dim,
-            activation_function=b_m_activation_layer,
+
+        self._b_m = torchvision.ops.MLP(
+            in_channels=x_dim, hidden_channels=b_m_hidden_channels, activation_layer=torch.nn.ReLU
         )
+
+        # Parametrization below work wierdly. TODO: Fix it
+        # self._log_v_m = nn.Sequential(
+        #     FullyConnectedMLP(
+        #         input_dim=x_dim,
+        #         hidden_layers=log_v_m_hidden_channels,
+        #         output_dim=m_potentials,
+        #         activation_function=log_v_m_activation_layer,
+        #     ),
+        #     nn.LogSoftmax(dim=-1),
+        # )
+        # self._b_m = FullyConnectedMLP(
+        #     input_dim=x_dim,
+        #     hidden_layers=b_m_hidden_channels,
+        #     output_dim=m_potentials * y_dim,
+        #     activation_function=b_m_activation_layer,
+        # )
 
     def compute_log_v_m(self, x: torch.Tensor) -> torch.Tensor:  # [M]
         return self._log_v_m(x[None, :]).squeeze()

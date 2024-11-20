@@ -54,9 +54,4 @@ class MLPL2Cost(BaseCost):
         )
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
-        # return torch.sum((self.x_net.func(x) - self.y_net.func(y)) ** 2)
-        # return (
-        #     1 - F.cosine_similarity(F.normalize(self.x_net(x[None, :])), F.normalize(self.y_net(y[None, :])))
-        # ).squeeze()
-        # return (1 - F.cosine_similarity(F.normalize(self.x_net(x[None, :])), F.normalize(y[None, :]))).squeeze()
         return torch.sum((self.x_net(x[None, :]) - y[None, :]) ** 2)

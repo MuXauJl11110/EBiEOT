@@ -2,7 +2,6 @@ from typing import Callable
 
 import torch.nn as nn
 from configs.base.cost import BaseCostConfig
-from pydantic import model_validator
 
 
 class MLPLSECostConfig(BaseCostConfig):
