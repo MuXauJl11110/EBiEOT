@@ -58,7 +58,9 @@ class MLPLSECost(BaseLSECost):
         # )
 
     def compute_log_v_m(self, x: torch.Tensor) -> torch.Tensor:  # [M]
-        return self._log_v_m(x[None, :]).squeeze()
+        # return self._log_v_m(x[None, :]).squeeze()
+        return self._log_v_m(x[None, :]).reshape(self.m_potentials)
 
     def compute_b_m(self, x: torch.Tensor) -> torch.Tensor:  # [M x y_dim]
-        return self._b_m(x[None, :]).reshape(self.m_potentials, self.y_dim).squeeze()
+        # return self._b_m(x[None, :]).reshape(self.m_potentials, self.y_dim).squeeze()
+        return self._b_m(x[None, :]).reshape(self.m_potentials, self.y_dim)
