@@ -76,6 +76,7 @@ class EGEOT(BaseGenerativeModel):
         init_sampler: Sampler | None = None,
     ) -> torch.Tensor:
         with torch.no_grad():
+            print(init_y_samples, init_sampler)
             if init_y_samples is not None:  # sample from initial distribution
                 y_samples = init_y_samples
             else:

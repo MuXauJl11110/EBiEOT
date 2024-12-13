@@ -5,12 +5,12 @@ import matplotlib.cm as cm
 import numpy as np
 import torch
 import torch.nn as nn
-import wandb
 from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
 
+import wandb
 from src.samplers.primary import GridGaussiansSampler, Sampler
 
 
@@ -428,3 +428,24 @@ def get_transport_plot_pca(
     else:
         plt.show()
         return
+
+
+def plot_images(X: torch.Tensor, Y_pred: torch.Tensor, Y: torch.Tensor, log: bool = False):
+    imgs = torch.cat([X, Y_pred, Y]).to("cpu").permute(0, 2, 3, 1).mul(0.5).add(0.5).numpy().clip(0, 1)
+    fig, axes = plt.subplots(3, 10, figsize=(15, 4.5), dpi=150)
+    for i, ax in enumerate(axes.flatten()):
+        ax.imshow(imgs[i], cmap="Greys")
+        ax.get_xaxis().set_visible(False)
+        ax.set_yticks([])
+
+    axes[0, 0].set_ylabel("X", fontsize=24)
+    axes[1, 0].set_ylabel("T(X)", fontsize=24)
+    axes[2, 0].set_ylabel("Y", fontsize=24)
+    fig.tight_layout(pad=0.001)
+
+    if log:
+        distr_dict = {"Distribution": wandb.Image(fig)}
+        plt.close(fig)
+        return distr_dict
+    else:
+        plt.show()

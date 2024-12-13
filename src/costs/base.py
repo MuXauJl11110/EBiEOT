@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.func import grad, vmap
 
 
+# TODO: remove x_dim, y_dim
 class BaseCost(ABC, nn.Module):
     def __init__(
         self,
@@ -14,8 +15,8 @@ class BaseCost(ABC, nn.Module):
         super().__init__()
         self.x_dim = x_dim
         self.y_dim = y_dim
-        self._grad_y = vmap(grad(self.func, argnums=1))
-        self._func = vmap(self.func)
+        self._grad_y = vmap(grad(self.func, argnums=1), randomness="different")  # TODO: change?
+        self._func = vmap(self.func, randomness="different")
 
     @abstractmethod
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]

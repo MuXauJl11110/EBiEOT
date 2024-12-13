@@ -70,14 +70,21 @@ def sample_langevin_batch(
             noise = sampling_noise * torch.sqrt(scaling_factors)[:, None]  # [bs]
 
         # Langevin dynamics
-        y = y + 0.5 * step[:, None] * score + noise[:, None] * z_t
+        step = step[:, None, None, None]  # [:, None]
+        noise = noise[:, None, None, None]  # [:, None]
+        y = y + 0.5 * step * score + noise * z_t
 
         # stats calculation
+        # if compute_stats:
+        #     r_t += (0.5 * step * torch.norm(score, dim=1)).mean()
+        #     cost_r_t += (0.5 * step * torch.norm(cost_part, dim=1)).mean()
+        #     score_r_t += (0.5 * step * torch.norm(score_part, dim=1)).mean()
+        #     noise_t += (noise * torch.norm(z_t, dim=1)).mean()
         if compute_stats:
-            r_t += (0.5 * step * torch.norm(score, dim=1)).mean()
-            cost_r_t += (0.5 * step * torch.norm(cost_part, dim=1)).mean()
-            score_r_t += (0.5 * step * torch.norm(score_part, dim=1)).mean()
-            noise_t += (noise * torch.norm(z_t, dim=1)).mean()
+            r_t += 0.5 * torch.linalg.vector_norm(step * score, dim=0).mean()
+            cost_r_t += 0.5 * torch.norm(step * cost_part, dim=0).mean()
+            score_r_t += 0.5 * torch.norm(step * score_part, dim=0).mean()
+            noise_t += torch.norm(noise * z_t, dim=0).mean()
 
         sampling_step *= decay
         sampling_noise *= np.sqrt(decay)
