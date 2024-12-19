@@ -159,4 +159,6 @@ datasets/
 ploomber_notebooks/
 notebooks/wandb
 wandb/
-outputs
+outputs/
+./mnist2to3/data/
+data/

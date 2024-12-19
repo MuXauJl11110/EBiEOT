@@ -1,154 +1,77 @@
-import functools
-
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
-class Down(nn.Module):
-    """Downscaling with maxpool then double conv"""
+class UNet(nn.Module):
+    def __init__(self, in_channels=3, out_channels=3, num_layers=4, base_filters=64):
+        """
+        Args:
+            in_channels (int): Number of input channels (e.g., 3 for RGB).
+            out_channels (int): Number of output channels (e.g., 3 for RGB).
+            num_layers (int): Number of encoder/decoder layers.
+            base_filters (int): Number of filters in the first layer. Subsequent layers double this.
+        """
+        super(UNet, self).__init__()
 
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.maxpool_conv = nn.Sequential(nn.MaxPool2d(2), DoubleConv(in_channels, out_channels))
+        self.num_layers = num_layers
 
-    def forward(self, x):
-        return self.maxpool_conv(x)
+        # Encoder
+        self.encoders = nn.ModuleList()
+        self.pools = nn.ModuleList()
+        filters = base_filters
+        for i in range(num_layers):
+            self.encoders.append(self.conv_block(in_channels if i == 0 else filters // 2, filters))
+            self.pools.append(nn.MaxPool2d(kernel_size=2, stride=2))
+            filters *= 2
 
+        # Bottleneck
+        self.bottleneck = self.conv_block(filters // 2, filters)
 
-class Up(nn.Module):
-    """Upscaling then double conv"""
+        # Decoder
+        self.ups = nn.ModuleList()
+        self.decoders = nn.ModuleList()
+        for i in range(num_layers):
+            self.ups.append(self.upconv(filters, filters // 2))
+            self.decoders.append(self.conv_block(filters, filters // 2))
+            filters //= 2
 
-    def __init__(self, in_channels, out_channels, bilinear=True):
-        super().__init__()
+        # Output layer
+        self.output_layer = nn.Conv2d(base_filters, out_channels, kernel_size=1)
 
-        # if bilinear, use the normal convolutions to reduce the number of channels
-        if bilinear:
-            self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
-        else:
-            self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
-
-    def forward(self, x1, x2):
-        x1 = self.up(x1)
-        # input is CHW
-        diffY = torch.tensor([x2.size()[2] - x1.size()[2]])
-        diffX = torch.tensor([x2.size()[3] - x1.size()[3]])
-
-        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
-        # if you have padding issues, see
-        # https://github.com/HaiyongJiang/U-Net-Pytorch-Unstructured-Buggy/commit/0e854509c2cea854e247a9c615f175f76fbb2e3a
-        # https://github.com/xiaopeng-liao/Pytorch-UNet/commit/8ebac70e633bac59fc22bb5195e513d5832fb3bd
-        x = torch.cat([x2, x1], dim=1)
-        return self.conv(x)
-
-
-class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-
-    def forward(self, x):
-        return self.conv(x)
-
-
-# Conditional Unet defined below
-class CondINorm(nn.Module):
-    def __init__(self, in_channels, z_channels, eps=1e-5):
-        super(CondINorm, self).__init__()
-        self.eps = eps
-        self.shift_conv = nn.Sequential(
-            nn.Conv2d(z_channels, in_channels, kernel_size=1, padding=0, bias=True), nn.ReLU(True)
-        )
-        self.scale_conv = nn.Sequential(
-            nn.Conv2d(z_channels, in_channels, kernel_size=1, padding=0, bias=True), nn.ReLU(True)
-        )
-
-    def forward(self, x, z):
-        shift = self.shift_conv.forward(z)
-        scale = self.scale_conv.forward(z)
-        size = x.size()
-        x_reshaped = x.view(size[0], size[1], size[2] * size[3])
-        mean = x_reshaped.mean(2, keepdim=True)
-        var = x_reshaped.var(2, keepdim=True)
-        std = torch.rsqrt(var + self.eps)
-        norm_features = ((x_reshaped - mean) * std).view(*size)
-        output = norm_features * scale + shift
-        return output
-
-
-class DoubleConv(nn.Module):
-    """(convolution => [BN] => ReLU) * 2"""
-
-    def __init__(self, in_channels, out_channels, mid_channels=None):
-        super().__init__()
-        if not mid_channels:
-            mid_channels = out_channels
-        self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1),
-            # nn.BatchNorm2d(mid_channels),
-            nn.BatchNorm2d(mid_channels, track_running_stats=False),
+    def conv_block(self, in_channels, out_channels):
+        """
+        Creates a convolutional block with two Conv2D layers followed by ReLU activations.
+        """
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1),
-            # nn.BatchNorm2d(out_channels),
-            nn.BatchNorm2d(mid_channels, track_running_stats=False),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
         )
-        # self.conv1 = nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1)
-        # self.bn1 = nn.BatchNorm2d(mid_channels, track_running_stats=False)
-        # self.act1 = nn.ReLU(inplace=True)
-        # self.conv2 = nn.Conv2d(mid_channels, out_channels, kernel_size=3, padding=1)
-        # self.bn2 = nn.BatchNorm2d(out_channels, track_running_stats=False)
-        # self.act2 = nn.ReLU(inplace=True)
+
+    def upconv(self, in_channels, out_channels):
+        """
+        Creates an up-convolution (transposed convolution) layer.
+        """
+        return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
 
     def forward(self, x):
-        return self.double_conv(x)
-        # x1 = self.conv1(x)
-        # x2 = self.bn1(x1)
-        # x3 = self.act1(x2)
-        # x4 = self.conv2(x3)
-        # x5 = self.bn2(x4)
-        # return self.act2(x5)
+        # Encoder path
+        enc_features = []
+        for i in range(self.num_layers):
+            x = self.encoders[i](x)
+            enc_features.append(x)
+            x = self.pools[i](x)
 
+        # Bottleneck
+        x = self.bottleneck(x)
 
-class CondUNetV2(nn.Module):
-    def __init__(self, n_channels, n_classes, z_channels, base_factor=32):
-        super(CondUNetV2, self).__init__()
-        self.n_channels = n_channels
-        self.n_classes = n_classes
-        self.z_channels = z_channels
-        self.base_factor = base_factor
+        # Decoder path
+        for i in range(self.num_layers):
+            x = self.ups[i](x)
+            skip_connection = enc_features[self.num_layers - 1 - i]
+            x = torch.cat((x, skip_connection), dim=1)  # Concatenate along channel dimension
+            x = self.decoders[i](x)
 
-        self.inc = DoubleConv(n_channels, base_factor)
-        self.down1 = Down(base_factor, 2 * base_factor)
-        self.down2 = Down(2 * base_factor, 4 * base_factor)
-        self.down3 = Down(4 * base_factor, 8 * base_factor)
-        factor = 2
-        self.down4 = Down(8 * base_factor, 16 * base_factor // factor)
-        # self.adain1 = CondINorm(16 * base_factor // factor, z_channels)
-        self.up1 = Up(16 * base_factor, 8 * base_factor // factor)
-        # self.adain2 = CondINorm(8 * base_factor // factor, z_channels)
-        self.up2 = Up(8 * base_factor, 4 * base_factor // factor)
-        # self.adain3 = CondINorm(4 * base_factor // factor, z_channels)
-        self.up3 = Up(4 * base_factor, 2 * base_factor // factor)
-        # self.adain4 = CondINorm(2 * base_factor // factor, z_channels)
-        self.up4 = Up(2 * base_factor, base_factor)
-        self.outc = OutConv(base_factor, n_classes)
-
-    def forward(self, x, z):
-        x1 = self.inc(x)
-        x2 = self.down1(x1)
-        x3 = self.down2(x2)
-        x4 = self.down3(x3)
-        x5 = self.down4(x4)
-        #x = self.adain1(x5, z)
-        x = self.up1(x, x4)
-        #x = self.adain2(x, z)
-        x = self.up2(x, x3)
-        #x = self.adain3(x, z)
-        x = self.up3(x, x2)
-        #x = self.adain4(x, z)
-        x = self.up4(x, x1)
-        logits = self.outc(x)
-        return logits
+        # Output layer
+        return self.output_layer(x)

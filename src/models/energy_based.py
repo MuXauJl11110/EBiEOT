@@ -76,7 +76,6 @@ class EGEOT(BaseGenerativeModel):
         init_sampler: Sampler | None = None,
     ) -> torch.Tensor:
         with torch.no_grad():
-            print(init_y_samples, init_sampler)
             if init_y_samples is not None:  # sample from initial distribution
                 y_samples = init_y_samples
             else:
@@ -146,9 +145,7 @@ class EGEOT(BaseGenerativeModel):
 
         return output | {"loss": loss, "int_potential": pos_out_mean, "int_log_Z": neg_out_mean}
 
-    def compute_paired_loss(
-        self, X_paired: torch.Tensor, Y_paired: torch.Tensor, compute_stats: bool = False
-    ) -> torch.Tensor:  # -> [1]
+    def compute_paired_loss(self, X_paired: torch.Tensor, Y_paired: torch.Tensor) -> dict[str, torch.Tensor]:  # -> [1]
         output = {}
         cost = self.cost.forward(X_paired, Y_paired)
         loss = cost.mean()

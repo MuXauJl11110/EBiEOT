@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class TrainConfig(BaseModel):
     name: str = "Energy-Based_Swiss_Roll"
-    seed: int = 42
+    seed: int = 123
 
     paired_batch_size: int = 1024
     unpaired_batch_size: int = 128

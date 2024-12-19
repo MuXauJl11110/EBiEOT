@@ -2,8 +2,7 @@ import torch
 
 from src.auxiliary_models.convolutional import NonlocalNet, VanillaNet
 from src.auxiliary_models.resnet import ResNet_D
-from src.auxiliary_models.unet import CondUNetV2
-from src.auxiliary_models.unet_v2 import UNetForScalarOutput
+from src.auxiliary_models.unet import UNet
 from src.costs.base import BaseCost
 
 
@@ -34,22 +33,10 @@ class ResNetCost(BaseCost):
         return self.net(torch.cat([x, y], dim=1)).squeeze()
 
 
-class UnetCost(BaseCost):
-    def __init__(self, n_channels: int, n_classes: int, z_channels: int, base_factor: int = 32):
+class UNetCost(BaseCost):
+    def __init__(self, n_c: int = 3, num_layers: int = 4, base_filters: int = 64):
         super().__init__()
-        self.net = CondUNetV2(n_channels, n_classes, z_channels, base_factor)
+        self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
-        return self.net(x[None, :, :, :], y[None, :, :, :]).squeeze()
-        # return torch.jit.trace(self.net, example_inputs=[x, y])
-
-
-class UnetV2Cost(BaseCost):
-    def __init__(self, in_channels: int = 3):
-        super().__init__()
-        self.net = UNetForScalarOutput(2 * in_channels, 1)
-
-    def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
-        input = torch.cat([x[None, :, :, :], y[None, :, :, :]], dim=1)
-        return self.net(input).squeeze()
-        # return torch.jit.trace(self.net, example_inputs=[x, y])
+        return (self.net(x.unsqueeze(0)) - y.unsqueeze(0)).square().mean()
