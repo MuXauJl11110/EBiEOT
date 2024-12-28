@@ -16,7 +16,7 @@ from src.samplers.energy_based.sample_buffer import SampleBuffer
 
 
 # The code of this class is based on https://github.com/PetrMokrov/Energy-guided-Entropic-OT/tree/main
-class EGEOT(BaseGenerativeModel):
+class EGEOT(BaseGenerativeModel, torch.nn.Module):
     """
     Energy-guided entropic optimal transport (EOT) with general cost function class
     """

@@ -16,10 +16,10 @@ class DiscreteEOT_l2sq_sampler:
         return numbers
 
     def __init__(self, X, Y, G, device="cpu"):
-        self.X = torch.tensor(X).float().to(device)
-        self.Y = torch.tensor(Y).float().to(device)
-        self.G = torch.tensor(G).float().to(device)
         self.device = device
+        self.X = torch.tensor(X).float().clone().detach().to(self.device)
+        self.Y = torch.tensor(Y).float().clone().detach().to(self.device)
+        self.G = torch.tensor(G).float().clone().detach().to(self.device)
 
     def sample(self, x_samples):
         raise NotImplementedError()
@@ -52,9 +52,9 @@ class DiscreteEOT_l2sq:
 
     def _cast(self, x):
         if self.dtype == "torch32":
-            return torch.tensor(x).float().to(self.device)
+            return torch.tensor(x).float().clone().detach().to(self.device)
         if self.dtype == "torch64":
-            return torch.tensor(x).double().to(self.device)
+            return torch.tensor(x).double().clone().detach().to(self.device)
 
     def __init__(
         self,

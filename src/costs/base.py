@@ -5,16 +5,9 @@ import torch.nn as nn
 from torch.func import grad, vmap
 
 
-# TODO: remove x_dim, y_dim
 class BaseCost(ABC, nn.Module):
-    def __init__(
-        self,
-        x_dim: int = 2,
-        y_dim: int = 2,
-    ):
+    def __init__(self):
         super().__init__()
-        self.x_dim = x_dim
-        self.y_dim = y_dim
         self._grad_y = vmap(grad(self.func, argnums=1), randomness="different")  # TODO: change?
         self._func = vmap(self.func, randomness="different")
 
@@ -31,21 +24,13 @@ class BaseCost(ABC, nn.Module):
 
 
 class BaseLSECost(BaseCost):
-    def __init__(
-        self,
-        x_dim: int = 2,
-        y_dim: int = 2,
-        m_potentials: int = 25,
-        epsilon: float = 1.0,
-    ):
+    def __init__(self, m_potentials: int = 25, epsilon: float = 1.0):
         r"""
-        :param int x_dim: Dimension of X space, defaults to 2
-        :param int y_dim: Dimension of Y space, defaults to 2
         :param int n_potentials: Number of potentials for approximating dual variable :math:`f(y)=\varepsilon\log\sum_{n=1}^N w_n \mathcal{N}(y\vert a_n, A_n/\varepsilon)`, defaults to 5
         :param int m_potentials: Number of potentials for approximating plan :math:`c(x, y)=-\varepsilon\log\sum_{m=1}^M v_m(x) \exp(\langle b_m(x), y \rangle) /\varepsilon`, defaults to 10
         :param float epsilon: Regularization parameter, defaults to 1.0
         """
-        super().__init__(x_dim, y_dim)
+        super().__init__()
         self.m_potentials = m_potentials
         self.register_buffer("epsilon", torch.tensor(epsilon))
         self.b_m = vmap(self.compute_b_m)  # batched version of self.compute_b_m

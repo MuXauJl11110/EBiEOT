@@ -34,9 +34,27 @@ class ResNetCost(BaseCost):
 
 
 class UNetCost(BaseCost):
-    def __init__(self, n_c: int = 3, num_layers: int = 4, base_filters: int = 64):
+    def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
         super().__init__()
         self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
         return (self.net(x.unsqueeze(0)) - y.unsqueeze(0)).square().mean()
+
+
+class UNetV2Cost(BaseCost):
+    def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
+        super().__init__()
+        self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
+
+    def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
+        return (self.net(x.unsqueeze(0)) - y.roll(shifts=-1, dims=0).unsqueeze(0)).square().mean()
+
+
+class UNetV3Cost(BaseCost):
+    def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
+        super().__init__()
+        self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
+
+    def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
+        return (self.net(y.unsqueeze(0)) - x.unsqueeze(0)).square().mean()

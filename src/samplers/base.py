@@ -17,11 +17,11 @@ class Sampler(ABC):
 
 
 class TensorSampler(Sampler):
-    def __init__(self, tensor: torch.Tensor, device="cuda"):
+    def __init__(self, tensor: torch.Tensor, device: str = "cuda"):
         super(TensorSampler, self).__init__(device)
         self.tensor = torch.clone(tensor).to(device)
 
-    def sample(self, size=5):
+    def sample(self, size: int = 5):
         assert size <= self.tensor.shape[0]
 
         ind = torch.tensor(

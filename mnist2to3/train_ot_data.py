@@ -6,28 +6,31 @@ import sys
 
 sys.path.append("..")
 import argparse
+import copy
 import json
 import os
 
-import numpy as np
 import torch
-import torchvision.datasets as datasets
-import torchvision.transforms as tr
-from configs.energy_based.model import EBMConfig
-from PIL import Image
 
 import wandb
-from mnist2to3.utils import (
-    download_colored_mnist_data,
-    plot_diagnostics,
-    plot_im_pairs,
-    plot_ims,
-    steps_counter,
+from configs.energy_based.model import EBMConfig
+from mnist2to3.utils import plot_diagnostics, plot_im_pairs, plot_ims, steps_counter
+from src.costs.convolutional import (
+    NonlocalCost,
+    UNetCost,
+    UNetV2Cost,
+    UNetV3Cost,
+    VanillaCost,
 )
-from src.costs.convolutional import NonlocalCost, UNetCost, VanillaCost
 from src.costs.nonlearnable import SquareCost
 from src.models.energy_based import EGEOT
-from src.potentials.convolutional import NonlocalPotential, VanillaPotential
+from src.potentials.vanilla import NonlocalPotential, VanillaPotential
+from src.utils.dataset.colored_mnist import (
+    apply_random_color,
+    download_digit_images,
+    get_paired_digits,
+)
+from src.utils.train import update_average
 
 # from nets import NonlocalNet, VanillaNet
 
@@ -72,32 +75,11 @@ with open(CONFIG_FILE) as file:
     config = json.load(file)
 
 # make directory for saving results
-# if os.path.exists(EXP_DIR):
-#     # prevents overwriting old experiment folders by accident
-#     raise RuntimeError('Folder "{}" already exists. Please use a different "EXP_DIR".'.format(EXP_DIR))
-# else:
-#     os.makedirs(EXP_DIR)
-#     for folder in ["checkpoints", "shortrun", "longrun", "plots", "code"]:
-#         os.mkdir(EXP_DIR + folder)
 os.makedirs(EXP_DIR, exist_ok=True)
 for folder in ["checkpoints", "shortrun", "longrun", "plots", "code"]:
     # os.mkdir(EXP_DIR + folder, exist_ok=True)
     os.makedirs(EXP_DIR + folder, exist_ok=True)
 
-
-# save copy of code in the experiment folder
-def save_code():
-    def save_file(file_name):
-        file_in = open("./" + file_name, "r")
-        file_out = open(EXP_DIR + "code/" + os.path.basename(file_name), "w")
-        for line in file_in:
-            file_out.write(line)
-
-    for file in ["train_ot_data.py", "nets.py", "utils.py", CONFIG_FILE]:
-        save_file(file)
-
-
-save_code()
 
 # set seed for cpu and CUDA, get device
 # DEVICE SETTING
@@ -117,6 +99,7 @@ if torch.cuda.is_available():
 # ## TRAINING SETUP # ##
 ########################
 HREG = config["hreg"]
+EMA_UPDATE = config["ema_update"]
 print("Setting up potential and optimizer...")
 # set up potential
 potential_bank = {"vanilla": VanillaPotential, "nonlocal": NonlocalPotential}
@@ -127,19 +110,21 @@ if config["optimizer_type"] == "sgd" and config["epsilon"] > 0:
     # scale learning rate according to langevin noise for invariant tuning
     config["lr_init"] *= (config["epsilon"] ** 2) / 2
     config["lr_min"] *= (config["epsilon"] ** 2) / 2
-f_optim = optim_bank[config["optimizer_type"]](f.parameters(), lr=config["lr_init"])
+# f_optim = optim_bank[config["optimizer_type"]](f.parameters(), lr=config["lr_init"])
 
 print("Setting up cost and optimizer...")
 # set up potential
 cost_bank = {
     "vanilla": VanillaCost,
     "nonlocal": NonlocalCost,
-    "unet": UNetCost,
+    # "unet": UNetCost,
+    "unet": UNetV2Cost,
+    # "unet": UNetV3Cost,
 }
-cost = cost_bank[config["cost_type"]](n_c=config["im_ch"]).to(device)
+cost = cost_bank[config["cost_type"]](n_c=config["im_ch"], num_layers=4, base_filters=16).to(device)
 # cost = SquareCost().to(device)
 # set up optimizer
-cost_optim = optim_bank[config["optimizer_type"]](cost.parameters(), lr=config["lr_init"])
+# cost_optim = optim_bank[config["optimizer_type"]](cost.parameters(), lr=config["lr_init"])
 print("Setting up EgEOT parameters...")
 model_config = EBMConfig()
 model = EGEOT(
@@ -147,107 +132,33 @@ model = EGEOT(
     cost=cost,
     sample_buffer=None,
     config=model_config,
-)
+).to(device)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=config["lr_init"])
+
+if EMA_UPDATE:
+    model_copy = copy.deepcopy(model)
 
 
 print("Processing data...")
 # TODO: Rethink data-generation (make more random)
+SOURCE_DATASET = "MNIST"
+TARGET_DATASET = "MNIST"
 SOURCE_DIGIT = 2
 TARGET_DIGIT = 3
-P_XY_PAIRED_SAMPLES = 10000
-IMAGE_SIZE = 32
+P_XY_PAIRED_SAMPLES = config["P_XY"]
 
-# Transformations
-transform = tr.Compose(
-    [
-        tr.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        tr.ToTensor(),
-        tr.Normalize(tuple(0.5 * torch.ones(IMAGE_SIZE)), tuple(0.5 * torch.ones(IMAGE_SIZE))),  # Normalize to [-1, 1]
-    ]
+source_images: list[torch.Tensor] = download_digit_images(SOURCE_DATASET, SOURCE_DIGIT, 10000)
+target_images: list[torch.Tensor] = download_digit_images(TARGET_DATASET, TARGET_DIGIT, 20000)
+
+q_x_paired, q_y_paired = get_paired_digits(
+    source_images, target_images, P_XY_PAIRED_SAMPLES, hue_offset=120, device=device
 )
 
-# Load MNIST dataset
-transform = tr.Compose(
-    [
-        tr.Resize((IMAGE_SIZE, IMAGE_SIZE)),  # Resize to 32x32 pixels
-        tr.ToTensor(),  # Convert to Tensor
-        tr.Normalize(tuple(0.5 * torch.ones(3)), tuple(0.5 * torch.ones(3))),  # Normalize to [-1, 1]
-    ]
-)
+q_x = torch.stack([apply_random_color(digit, 360 * torch.rand(1)) for digit in source_images]).to(device)
+q_y = torch.stack([apply_random_color(digit, 360 * torch.rand(1)) for digit in target_images]).to(device)
 
-# Load MNIST dataset
-mnist_data = datasets.MNIST(root="./data", train=True, download=True)
-
-
-def apply_random_color(image, color):
-    """Apply a specific RGB color to a grayscale image."""
-    image = np.array(image)
-    colored_image = np.stack([image] * 3, axis=-1)  # Convert grayscale to RGB
-    colored_image = (colored_image / 255.0 * color).astype(np.uint8)  # Apply color
-    return Image.fromarray(colored_image)
-
-
-def filter_digit_images(digit):
-    """Filter MNIST dataset for a specific digit."""
-    indices = [i for i, label in enumerate(mnist_data.targets) if label == digit]
-    return [mnist_data.data[i] for i in indices]
-
-
-# Get digit images for 2 and 3
-digit_2_images = filter_digit_images(2)
-digit_3_images = filter_digit_images(3)
-
-# Generate Paired Samples
-paired_source_samples = []
-paired_target_samples = []
-for i in range(P_XY_PAIRED_SAMPLES):
-    color = np.random.randint(0, 256, size=3)  # Generate one random color
-    source_tensor = transform(apply_random_color(digit_2_images[i], color))
-    target_tensor = transform(apply_random_color(digit_3_images[i], color))
-
-    paired_source_samples.append(source_tensor)
-    paired_target_samples.append(target_tensor)
-
-q_x_paired = torch.stack(paired_source_samples).to(device)
-q_y_paired = torch.stack(paired_target_samples).to(device)
-
-# # Generate Unpaired Source Samples
-# q_x = torch.stack(
-#     [
-#         transform(apply_random_color(src_digit, np.random.randint(0, 256, size=3)))
-#         for src_digit in digit_2_images[P_XY_PAIRED_SAMPLES:]
-#     ]
-# ).to(device)
-
-# # Generate Unpaired Target Samples
-# q_y = torch.stack(
-#     [
-#         transform(apply_random_color(trgt_digit, np.random.randint(0, 256, size=3)))
-#         for trgt_digit in digit_3_images[P_XY_PAIRED_SAMPLES:]
-#     ]
-# ).to(device)
-
-download_colored_mnist_data("MNISTcolored_2")
-download_colored_mnist_data("MNISTcolored_3")
-src_data_name = "MNISTcolored_2"
-trg_data_name = "MNISTcolored_3"
-
-data = {
-    src_data_name: lambda path, func: datasets.ImageFolder(root=path, transform=func),
-    trg_data_name: lambda path, func: datasets.ImageFolder(root=path, transform=func),
-}
-transform = tr.Compose(
-    [
-        tr.Resize(config["im_sz"]),
-        tr.CenterCrop(config["im_sz"]),
-        tr.ToTensor(),
-        tr.Normalize(tuple(0.5 * torch.ones(config["im_ch"])), tuple(0.5 * torch.ones(config["im_ch"]))),
-    ]
-)
-q_x = torch.stack([x[0] for x in data[src_data_name]("./data/" + src_data_name, transform)]).to(device)
-q_y = torch.stack([x[0] for x in data[trg_data_name]("./data/" + trg_data_name, transform)]).to(device)
-
-print(f"Q_X_UNPAIRED: {len(q_x)}; R_Y_PAIRED: {len(q_y)}")
+print(f"Q_X_UNPAIRED: {q_x.shape}; R_Y_UNPAIRED: {q_y.shape}")
 
 # initialize persistent images from noise (one persistent image for each data image)
 # s_t_0 is used when init_type == 'persistent' in sample_s_t()
@@ -266,7 +177,7 @@ def solve_dot(X: torch.Tensor, Y: torch.Tensor, numitermax: int = 10000, verbose
     DOT_NUMITERMAX = numitermax
     DOT_VERBOSE = verbose
     discr_eot = DiscreteEOT_l2sq(device=device, verbose=DOT_VERBOSE, numItermax=DOT_NUMITERMAX, dtype=DOT_DTYPE).solve(
-        X.view(X.size(0), -1), Y.view(Y.size(0), -1), config["hreg"]
+        X.view(X.size(0), -1), Y.view(Y.size(0), -1), HREG
     )
     x_inds = torch.arange(X.size(0))
     y_inds = discr_eot.sample_by_indices(x_inds, return_indices=True)
@@ -296,7 +207,7 @@ def sample_pairs():
 
 
 # initialize and update images with langevin dynamics to obtain samples from finite-step MCMC distribution s_t
-def sample_s_t(L: int, init_type: str, update_s_t_0: bool = True):
+def sample_s_t(model: EGEOT, L: int, init_type: str, update_s_t_0: bool = True):
     # get initial mcmc states for langevin updates ("persistent", "data", "uniform", or "gaussian")
     def sample_s_t_0():
         """
@@ -333,6 +244,10 @@ def sample_s_t(L: int, init_type: str, update_s_t_0: bool = True):
             x_image_subset, _ = sample_image_set(q_x)
             noise_image = torch.randn([config["batch_size"], config["im_ch"], config["im_sz"], config["im_sz"]])
             return noise_image.to(device), x_image_subset, None
+        elif init_type == "from_cost":
+            x_image_subset, _ = sample_image_set(q_x)
+            y_s_t = model.cost.net(x_image_subset)
+            return y_s_t, x_image_subset, None
         else:
             raise RuntimeError('Invalid method for "init_type" (use "persistent", "data", "uniform", or "gaussian")')
 
@@ -341,23 +256,19 @@ def sample_s_t(L: int, init_type: str, update_s_t_0: bool = True):
 
     # iterative langevin updates of MCMC samples
     r_s_t = torch.zeros(1).to(device)  # variable r_s_t (Section 3.2) to record average gradient magnitude
-    for ell in range(L):
+    cost_grad_s_t = torch.zeros(1).to(device)
+    for _ in range(L):
         f_prime = model.potential.grad_y(y_s_t_0)
-        # grad_cost_coeff = (config["epsilon"] ** 2) / (2.0 * HREG)
-        # y_s_t_0 += (
-        #     -f_prime
-        #     + grad_cost_coeff * model.cost.grad_y(x_s_t_0, y_s_t_0)
-        #     + config["epsilon"] * torch.randn_like(y_s_t_0)
-        # )
-        # grad_coeff = config["epsilon"] ** 2 / 2.0
-        y_s_t_0 += (f_prime - model.cost.grad_y(x_s_t_0, y_s_t_0)) + config["epsilon"] * torch.randn_like(y_s_t_0)
+        cost_grad = model.cost.grad_y(x_s_t_0, y_s_t_0)
+        y_s_t_0 += (f_prime - cost_grad) / (2 * HREG) + config["epsilon"] * torch.randn_like(y_s_t_0)
         r_s_t += f_prime.view(f_prime.shape[0], -1).norm(dim=1).mean()
+        cost_grad_s_t += cost_grad.view(f_prime.shape[0], -1).norm(dim=1).mean()
 
     if init_type == "persistent" and update_s_t_0:
         # update persistent image bank
         s_t_0.data[s_t_0_inds] = y_s_t_0.detach().data.clone()
 
-    return y_s_t_0.detach(), x_s_t_0, r_s_t.squeeze() / L
+    return y_s_t_0.detach(), x_s_t_0, r_s_t.squeeze() / L, cost_grad_s_t.squeeze() / L
 
 
 #######################
@@ -381,54 +292,86 @@ for i in range(config["num_train_iters"]):
     # obtain positive and negative samples
     samp_q_y = sample_q_y()
     with torch.no_grad():
-        y_s_t, x_s_t, r_s_t = sample_s_t(L=config["num_shortrun_steps"], init_type=config["shortrun_init"])
+        y_s_t, x_s_t, r_s_t, cost_grad_s_t = sample_s_t(
+            model, L=config["num_shortrun_steps"], init_type=config["shortrun_init"]
+        )
 
     # calculate ML computational loss d_s_t (Section 3) for data and shortrun samples
-    # d_s_t = f(samp_q_y).mean() - f(y_s_t).mean()
     d_s_t = -f(samp_q_y).mean() + f(y_s_t).mean()
     # Uncomment also lines in sample_s_t. Maybe scale at the end?
     if config["epsilon"] > 0:
         # scale loss with the langevin implementation
         d_s_t *= 2 / (config["epsilon"] ** 2)
     # stochastic gradient ML update for model weights
-    f_optim.zero_grad()
+    optimizer.zero_grad()
+    # f_optim.zero_grad()
     d_s_t.backward()
-    f_optim.step()
+    # f_optim.step()
 
     q_x_p, q_y_p = sample_pairs()
     paired_loss = model.compute_paired_loss(q_x_p, q_y_p)["loss"]
     if config["epsilon"] > 0:
         # scale loss with the langevin implementation
         paired_loss *= 2 / (config["epsilon"] ** 2)
-    cost_optim.zero_grad()
+
+    # cost_optim.zero_grad()
     paired_loss.backward()
-    cost_optim.step()
+    # cost_optim.step()
+    optimizer.step()
+
+    if EMA_UPDATE:
+        update_average(model_copy, model, 0.99)
 
     # record diagnostics
     d_s_t_record[i] = d_s_t.detach().data
     r_s_t_record[i] = r_s_t
 
     # anneal learning rate
-    for lr_gp in f_optim.param_groups:
-        lr_gp["lr"] = max(config["lr_min"], lr_gp["lr"] * config["lr_decay"])
+    # for lr_gp in f_optim.param_groups:
+    #     lr_gp["lr"] = max(config["lr_min"], lr_gp["lr"] * config["lr_decay"])
 
-    for lr_gp in cost_optim.param_groups:
+    # for lr_gp in cost_optim.param_groups:
+    #     lr_gp["lr"] = max(config["lr_min"], lr_gp["lr"] * config["lr_decay"])
+    for lr_gp in optimizer.param_groups:
         lr_gp["lr"] = max(config["lr_min"], lr_gp["lr"] * config["lr_decay"])
 
     # update wandb data
     if USE_WANDB:
-        res_dict = {"d_s_t": d_s_t.detach().data, "r_s_t": r_s_t, "cost": paired_loss.item()}
+        res_dict = {
+            "d_s_t": d_s_t.detach().data,
+            "r_s_t": r_s_t,
+            "cost": paired_loss.detach().data,
+            "cost_grad_s_t": cost_grad_s_t,
+        }
         wandb.log({"train": res_dict}, step=i)
 
     # print and save learning info
     if (i + 1) == 1 or (i + 1) % config["log_freq"] == 0:
-        print("{:>6d}   d_s_t={:>14.9f}   r_s_t={:>14.9f}".format(i + 1, d_s_t.detach().data, r_s_t))
+        print(
+            "{:>6d}   d_s_t={:>14.9f}   r_s_t={:>14.9f}    cost_grad_s_t={:>14.9f}".format(
+                i + 1, d_s_t.detach().data, r_s_t, cost_grad_s_t
+            )
+        )
         # visualize synthesized images
+        if EMA_UPDATE:
+            with torch.no_grad():
+                y_s_t, x_s_t, r_s_t, cost_grad_s_t = sample_s_t(
+                    model_copy, L=config["num_shortrun_steps"], init_type=config["shortrun_init"]
+                )
         plot_im_pairs(
             EXP_DIR + "shortrun/" + "pairs_x->y_s_t_{:>06d}.png".format(i + 1),
             x_s_t,
             y_s_t,
             im_name="pairs x->y, shortrun, pbuff init",
+            n_step=i,
+            use_wandb=USE_WANDB,
+        )
+        # WARNING: work only for unet potential
+        plot_im_pairs(
+            EXP_DIR + "shortrun/" + "pairs_x->g(x){:>06d}.png".format(i + 1),
+            x_s_t,
+            model.cost.net(x_s_t),
+            im_name="pairs x->g(x)",
             n_step=i,
             use_wandb=USE_WANDB,
         )
@@ -444,16 +387,28 @@ for i in range(config["num_train_iters"]):
         # save network weights
         torch.save(f.state_dict(), EXP_DIR + "checkpoints/" + "net_{:>06d}.pth".format(i + 1))
         # plot diagnostics for energy difference d_s_t and gradient magnitude r_t
-        if (i + 1) > 1:
-            plot_diagnostics(i, d_s_t_record, r_s_t_record, EXP_DIR + "plots/")
+        # if (i + 1) > 1:
+        #     plot_diagnostics(i, d_s_t_record, r_s_t_record, EXP_DIR + "plots/")
+        # torch.cuda.empty_cache()
 
     # sample longrun chains to diagnose model steady-state
     if config["log_longrun"] and (i + 1) % config["log_longrun_freq"] == 0:
         print("{:>6d}   Generating long-run samples. (L={:>6d} MCMC steps)".format(i + 1, config["num_longrun_steps"]))
-        for init_type in ["DOT", "persistent", "uniform", "source_data", "target_data"]:
-            y_p_theta, x_p_theta, _ = sample_s_t(
-                L=config["num_longrun_steps"], init_type=init_type, update_s_t_0=False
-            )
+        for init_type in [
+            "DOT",
+            "persistent",
+            "target_data",
+            "from_cost",
+        ]:  # ["DOT", "persistent", "uniform", "source_data", "target_data"]:
+            with torch.no_grad():
+                if EMA_UPDATE:
+                    y_p_theta, x_p_theta, _, _ = sample_s_t(
+                        model_copy, L=config["num_longrun_steps"], init_type=init_type, update_s_t_0=False
+                    )
+                else:
+                    y_p_theta, x_p_theta, _, _ = sample_s_t(
+                        model, L=config["num_longrun_steps"], init_type=init_type, update_s_t_0=False
+                    )
             plot_im_pairs(
                 EXP_DIR + "longrun/" + "longrun_{}_{:>06d}.png".format(init_type, i + 1),
                 x_p_theta,
@@ -463,3 +418,6 @@ for i in range(config["num_train_iters"]):
                 use_wandb=USE_WANDB,
             )
             print("{:>6d}   Long-run samples for init {} saved.".format(i + 1, init_type))
+
+    # WARNING: To reduce memory leakage
+    # del samp_q_y, y_s_t, x_s_t, r_s_t

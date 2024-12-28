@@ -1,156 +1,16 @@
 # download Oxford Flowers 102, plotting functions, and toy dataset
 
-import os
-import shutil
 import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as t
+import torch
 import torchvision as tv
-import torchvision.datasets as datasets
-from torch.utils.data import TensorDataset
 
 sys.path.append("../..")
-from torchvision.utils import save_image
 
 import wandb
-
-################################
-# ## DOWNLOAD COLORED MNIST ## #
-################################
-
-
-def get_random_colored_images(images, pix_val_range=(-1.0, 1.0), seed=0x000000):
-    np.random.seed(seed)
-
-    pix_val_transform = lambda x: (pix_val_range[1] - pix_val_range[0]) * x + pix_val_range[0]
-    back_pix_val_transform = lambda x: (x - pix_val_range[0]) / (pix_val_range[1] - pix_val_range[0])
-
-    images = back_pix_val_transform(images)
-    size = images.shape[0]
-    colored_images = []
-    hues = 360 * np.random.rand(size)
-
-    for V, H in zip(images, hues):
-        V_min = 0
-
-        a = (V - V_min) * (H % 60) / 60
-        V_inc = a
-        V_dec = V - a
-
-        colored_image = t.zeros((3, V.shape[1], V.shape[2]))
-        H_i = round(H / 60) % 6
-
-        if H_i == 0:
-            colored_image[0] = V
-            colored_image[1] = V_inc
-            colored_image[2] = V_min
-        elif H_i == 1:
-            colored_image[0] = V_dec
-            colored_image[1] = V
-            colored_image[2] = V_min
-        elif H_i == 2:
-            colored_image[0] = V_min
-            colored_image[1] = V
-            colored_image[2] = V_inc
-        elif H_i == 3:
-            colored_image[0] = V_min
-            colored_image[1] = V_dec
-            colored_image[2] = V
-        elif H_i == 4:
-            colored_image[0] = V_inc
-            colored_image[1] = V_min
-            colored_image[2] = V
-        elif H_i == 5:
-            colored_image[0] = V
-            colored_image[1] = V_min
-            colored_image[2] = V_dec
-
-        colored_images.append(colored_image)
-
-    colored_images = t.stack(colored_images, dim=0)
-    colored_images = pix_val_transform(colored_images)
-
-    return colored_images
-
-
-def load_cmnist_dataset(
-    name, path, batch_size=64, shuffle=True, device="cuda", pix_val_range=(-1.0, 1.0), seed=0x000000
-):
-
-    pix_val_transform = lambda x: (pix_val_range[1] - pix_val_range[0]) * x + pix_val_range[0]
-
-    assert name.startswith("MNIST")
-
-    # In case of using certain classe from the MNIST dataset you need to specify them by writing in the next format "MNIST_{digit}_{digit}_..._{digit}"
-    transform = tv.transforms.Compose(
-        [tv.transforms.Resize((32, 32)), tv.transforms.ToTensor(), tv.transforms.Lambda(pix_val_transform)]
-    )
-
-    dataset_name = name.split("_")[0]
-    is_colored = dataset_name[-7:] == "colored"
-
-    classes = [int(number) for number in name.split("_")[1:]]
-    if not classes:
-        classes = [i for i in range(10)]
-
-    train_set = datasets.MNIST(path, train=True, transform=transform, download=True)
-    test_set = datasets.MNIST(path, train=False, transform=transform, download=True)
-
-    train_test = []
-
-    for dataset in [train_set, test_set]:
-        data = []
-        labels = []
-        for k in range(len(classes)):
-            data.append(
-                t.stack(
-                    [dataset[i][0] for i in range(len(dataset.targets)) if dataset.targets[i] == classes[k]], dim=0
-                )
-            )
-            labels += [k] * data[-1].shape[0]
-        data = t.cat(data, dim=0)
-        data = data.reshape(-1, 1, 32, 32)
-        labels = t.tensor(labels)
-
-        if is_colored:
-            data = get_random_colored_images(data, pix_val_range, seed=seed)
-
-        train_test.append(TensorDataset(data, labels))
-
-    train_set, test_set = train_test
-    return train_set, test_set
-
-
-def download_colored_mnist_data(name):
-
-    first_feature = lambda x: x[0] if isinstance(x, (list, tuple)) else x
-
-    dataset_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/{}/".format(name))
-    if not os.path.exists(dataset_folder):
-        os.makedirs(dataset_folder)
-    else:
-        return
-    raw_folder = os.path.join(dataset_folder, "__raw")
-    ims_folder = os.path.join(dataset_folder, "ims")
-    if not os.path.exists(raw_folder):
-        os.makedirs(raw_folder)
-    os.makedirs(ims_folder)
-    train_dataset, test_dataset = load_cmnist_dataset(
-        name, raw_folder, batch_size=64, shuffle=False, device="cpu", pix_val_range=(0.0, 1.0)
-    )
-
-    i = 0
-    for dataset in [train_dataset, test_dataset]:
-        for im in dataset:
-            im_file_name = os.path.join(ims_folder, "im_{:>06d}.png".format(i))
-            save_image(first_feature(im), im_file_name)
-            i += 1
-
-    shutil.rmtree(raw_folder)
-
 
 ##################
 # ## PLOTTING ## #
@@ -159,7 +19,7 @@ def download_colored_mnist_data(name):
 
 # visualize negative samples synthesized from energy
 def plot_ims(p, x, n_step=None, im_name="dummy name", use_wandb=False, nrow=None, invert=False):
-    x = t.clamp(x, -1.0, 1.0)
+    x = torch.clamp(x, -1.0, 1.0)
     if invert:
         x = 1.0 - x
     if nrow is None:
@@ -185,7 +45,7 @@ def plot_im_pairs(p, x, y, n_step=None, im_name="dummy name", use_wandb=False, n
         nrow = int(x.shape[0] ** 0.5)
     assert x.shape == y.shape
     im_shape = tuple(x.shape[1:])
-    to_draw = t.clamp(t.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
+    to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
     if invert:
         to_draw = 1.0 - to_draw
     pad_value = 1.0 if invert else 0.0
@@ -232,11 +92,13 @@ def plot_diagnostics(batch, en_diffs, grad_mags, exp_dir, fontsize=10):
         t_gap = t_end - t_init
         max_lag = min(max_lag, t_gap - 1)
         # rescale energy diffs to unit mean square but leave uncentered
-        en_rescale = en_diffs[t_init:t_end] / t.sqrt(
-            t.sum(en_diffs[t_init:t_end] * en_diffs[t_init:t_end]) / (t_gap - 1)
+        en_rescale = en_diffs[t_init:t_end] / torch.sqrt(
+            torch.sum(en_diffs[t_init:t_end] * en_diffs[t_init:t_end]) / (t_gap - 1)
         )
         # normalize gradient magnitudes
-        grad_rescale = (grad_mags[t_init:t_end] - t.mean(grad_mags[t_init:t_end])) / t.std(grad_mags[t_init:t_end])
+        grad_rescale = (grad_mags[t_init:t_end] - torch.mean(grad_mags[t_init:t_end])) / torch.std(
+            grad_mags[t_init:t_end]
+        )
         # cross-correlation and auto-correlations
         cross_corr = np.correlate(en_rescale.cpu().numpy(), grad_rescale.cpu().numpy(), "full") / (t_gap - 1)
         en_acorr = np.correlate(en_rescale.cpu().numpy(), en_rescale.cpu().numpy(), "full") / (t_gap - 1)

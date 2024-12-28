@@ -2,9 +2,10 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
-from torchvision.models import ResNet18_Weights, ResNet50_Weights, resnet18, resnet50
+from torchvision.models import ResNet18_Weights, resnet18
 
 from src.auxiliary_models.mlp_based import FullyConnectedMLP
+from src.auxiliary_models.resnet import ResNet_D
 from src.potentials.base import BasePotential
 
 
@@ -37,11 +38,10 @@ class ResNet18Potential(BasePotential):
         return self.linear(self.net(y.repeat(1, 3, 1, 1))).squeeze()
 
 
-class ResNet50Potential(BasePotential):
-    def __init__(self):
+class ResNetPotential(BasePotential):
+    def __init__(self, size: int = 64, nc: int = 3, nfilter: int = 64, nfilter_max: int = 512, res_ratio: float = 0.1):
         super().__init__()
-        self.net = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2).eval()
-        self.linear = torch.nn.Linear(1000, 1)
+        self.net = ResNet_D(size, nc, nfilter, nfilter_max, res_ratio)
 
     def func(self, y: torch.Tensor) -> torch.Tensor:  # -> [1]
-        return self.linear(self.net(y.repeat(1, 3, 1, 1))).squeeze()
+        return self.net(y).squeeze()
