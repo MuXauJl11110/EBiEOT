@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+from torchvision.transforms import functional
 
 from src.auxiliary_models.convolutional import NonlocalNet, VanillaNet
 from src.auxiliary_models.resnet import ResNet_D
@@ -36,7 +38,9 @@ class ResNetCost(BaseCost):
 class UNetCost(BaseCost):
     def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
         super().__init__()
-        self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
+        self.net = nn.Sequential(
+            UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters), nn.Tanh()
+        )
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
         return (self.net(x.unsqueeze(0)) - y.unsqueeze(0)).square().mean()
@@ -58,3 +62,14 @@ class UNetV3Cost(BaseCost):
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
         return (self.net(y.unsqueeze(0)) - x.unsqueeze(0)).square().mean()
+
+
+class UNetV4Cost(BaseCost):
+    def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
+        super().__init__()
+        self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
+
+    def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
+        with torch.no_grad():
+            self.eval()
+            return (functional.adjust_hue(x, 1 / 3) - y).square().mean()

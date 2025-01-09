@@ -1,9 +1,6 @@
 import torch
 import torchvision.transforms as transforms
-from torch.utils.data.dataset import TensorDataset
 from torchvision import datasets
-
-from src.samplers.from_dataset import DatasetSampler
 
 
 def apply_random_color(image: torch.Tensor, hue: torch.Tensor) -> torch.Tensor:
@@ -13,8 +10,6 @@ def apply_random_color(image: torch.Tensor, hue: torch.Tensor) -> torch.Tensor:
     image_dec = image - image_diff
     colored_image = torch.zeros((3, image.shape[1], image.shape[2]))
     H_i = torch.round(hue / 60) % 6  # type: ignore
-
-    transform_norm = transforms.Normalize([0.5], [0.5])
 
     if H_i == 0:
         colored_image[0] = image
@@ -41,7 +36,7 @@ def apply_random_color(image: torch.Tensor, hue: torch.Tensor) -> torch.Tensor:
         colored_image[1] = image_min
         colored_image[2] = image_dec
 
-    return transform_norm(colored_image)
+    return colored_image
 
 
 def download_digit_images(
@@ -57,7 +52,6 @@ def download_digit_images(
         [
             transforms.Resize(image_size),
             transforms.ToTensor(),
-            transforms.Normalize([0.5], [0.5]),
         ]
     )
 

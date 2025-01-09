@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision as tv
+import torchvision.transforms as transforms
 
 sys.path.append("../..")
 
@@ -45,21 +46,30 @@ def plot_im_pairs(p, x, y, n_step=None, im_name="dummy name", use_wandb=False, n
         nrow = int(x.shape[0] ** 0.5)
     assert x.shape == y.shape
     im_shape = tuple(x.shape[1:])
+    # if invert:
+    #     to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
+    #     to_draw = 1.0 - to_draw
+    # else:
+    #     to_draw = torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape)
+
     to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
+
+    # min_val = y.min()
+    # max_val = y.max()
+    # y = (y - min_val) / (max_val - min_val)
+    # # Rescale to the range [-1, 1]
+    # y = y * 2 - 1
+    # to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
     if invert:
         to_draw = 1.0 - to_draw
     pad_value = 1.0 if invert else 0.0
     if not use_wandb:
         tv.utils.save_image(to_draw, p, normalize=True, nrow=nrow, pad_value=pad_value)
     else:
-        SB_torch_grid = tv.utils.make_grid(to_draw, nrow=nrow, pad_value=pad_value, normalize=True)
+        SB_torch_grid = tv.utils.make_grid(to_draw, nrow=nrow, pad_value=pad_value, normalize=False)
         SB_images = wandb.Image(SB_torch_grid, caption="first: X, second: Y")
         wandb.log(
-            {
-                im_name: [
-                    SB_images,
-                ]
-            },
+            {im_name: [SB_images]},
             step=n_step,
         )
 

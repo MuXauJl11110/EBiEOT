@@ -20,6 +20,7 @@ from src.costs.convolutional import (
     UNetCost,
     UNetV2Cost,
     UNetV3Cost,
+    UNetV4Cost,
     VanillaCost,
 )
 from src.costs.nonlearnable import SquareCost
@@ -117,11 +118,13 @@ print("Setting up cost and optimizer...")
 cost_bank = {
     "vanilla": VanillaCost,
     "nonlocal": NonlocalCost,
-    # "unet": UNetCost,
-    "unet": UNetV2Cost,
+    "unet": UNetCost,
+    # "unet": UNetV2Cost,
     # "unet": UNetV3Cost,
+    # "unet": UNetV4Cost,
 }
-cost = cost_bank[config["cost_type"]](n_c=config["im_ch"], num_layers=4, base_filters=16).to(device)
+# see line 321
+cost = cost_bank[config["cost_type"]](n_c=config["im_ch"]).to(device)  # , num_layers=4, base_filters=16).to(device)
 # cost = SquareCost().to(device)
 # set up optimizer
 # cost_optim = optim_bank[config["optimizer_type"]](cost.parameters(), lr=config["lr_init"])
@@ -394,12 +397,7 @@ for i in range(config["num_train_iters"]):
     # sample longrun chains to diagnose model steady-state
     if config["log_longrun"] and (i + 1) % config["log_longrun_freq"] == 0:
         print("{:>6d}   Generating long-run samples. (L={:>6d} MCMC steps)".format(i + 1, config["num_longrun_steps"]))
-        for init_type in [
-            "DOT",
-            "persistent",
-            "target_data",
-            "from_cost",
-        ]:  # ["DOT", "persistent", "uniform", "source_data", "target_data"]:
+        for init_type in [config["shortrun_init"]]:  # ["DOT", "persistent", "uniform", "source_data", "target_data"]:
             with torch.no_grad():
                 if EMA_UPDATE:
                     y_p_theta, x_p_theta, _, _ = sample_s_t(
