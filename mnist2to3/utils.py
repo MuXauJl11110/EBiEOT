@@ -1,77 +1,101 @@
 # download Oxford Flowers 102, plotting functions, and toy dataset
 
+import os
 import sys
+from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision as tv
-import torchvision.transforms as transforms
+from torchvision import transforms
 
 sys.path.append("../..")
 
 import wandb
 
+
 ##################
 # ## PLOTTING ## #
 ##################
+def normalize_tensor(tensor: torch.Tensor) -> torch.Tensor:
+    return (tensor - tensor.min()) / (tensor.max() - tensor.min())
 
 
-# visualize negative samples synthesized from energy
-def plot_ims(p, x, n_step=None, im_name="dummy name", use_wandb=False, nrow=None, invert=False):
-    x = torch.clamp(x, -1.0, 1.0)
-    if invert:
-        x = 1.0 - x
+def tensor2image(tensor: torch.Tensor, normalize: bool = True, invert: bool = False) -> torch.Tensor:
+    tensor = normalize_tensor(tensor) if normalize else tensor
+    assert not invert or normalize
+    tensor = 1 - tensor if invert else tensor
+
+    return (tensor * 255).byte()
+
+
+def plot_images(
+    image_name: str,
+    source_tensor: torch.Tensor,
+    step: int,
+    target_tensor: torch.Tensor | None = None,
+    nrow: int | None = None,
+    invert: bool = False,
+    clamp: bool = True,
+    normalize: bool = True,
+    use_wandb: bool = False,
+    save_dir: Path | None = None,
+):
+    if target_tensor is not None:
+        assert source_tensor.shape == target_tensor.shape
+
     if nrow is None:
-        nrow = int(x.shape[0] ** 0.5)
-    pad_value = 1.0 if invert else 0.0
-    if not use_wandb:
-        tv.utils.save_image(x, p, normalize=True, nrow=nrow, pad_value=pad_value)
+        nrow = int(source_tensor.shape[0] ** 0.5)
+    im_shape = tuple(source_tensor.shape[1:])  # source_tensor: [B, C, H, W]
+
+    normalize_transorm = transforms.Normalize(mean=[0.5], std=[0.5])
+    source_tensor = normalize_transorm(source_tensor) if normalize else source_tensor
+    source_tensor = source_tensor.clamp(-1.0, 1.0) if clamp else source_tensor
+    source_images = tensor2image(source_tensor, invert=invert)
+    if target_tensor is not None:
+        target_tensor = normalize_transorm(target_tensor) if normalize else target_tensor
+        target_tensor = target_tensor.clamp(-1.0, 1.0) if clamp else target_tensor
+        target_images = tensor2image(target_tensor, invert=invert)
+        output_images = torch.stack([source_images, target_images], dim=1).view(-1, *im_shape)
     else:
-        SB_torch_grid = tv.utils.make_grid(x, nrow=nrow, pad_value=pad_value, normalize=True)
-        SB_images = wandb.Image(SB_torch_grid, caption="Xs")
-        wandb.log(
-            {
-                im_name: [
-                    SB_images,
-                ]
-            },
-            step=n_step,
+        output_images = source_images
+
+    # pad_value = 1.0 if invert else 0.0
+    pad_value = 0
+    grid = tv.utils.make_grid(output_images, nrow=nrow, pad_value=pad_value)
+
+    fig = plt.figure()
+    plt.imshow(grid.permute(1, 2, 0).detach().cpu().numpy())
+    plt.axis("off")
+
+    # Add column subtitles
+    columns = ["Column 1", "Column 2", "Column 3", "Column 4"]
+    for i, col in enumerate(columns):
+        plt.text(
+            i * grid.shape[2] // 4 + grid.shape[2] // 8,
+            -15,
+            col,
+            color="black",
+            ha="center",
+            va="center",
+            fontsize=12,
+            weight="bold",
         )
 
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
 
-def plot_im_pairs(p, x, y, n_step=None, im_name="dummy name", use_wandb=False, nrow=None, invert=False):
-    if nrow is None:
-        nrow = int(x.shape[0] ** 0.5)
-    assert x.shape == y.shape
-    im_shape = tuple(x.shape[1:])
-    # if invert:
-    #     to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
-    #     to_draw = 1.0 - to_draw
-    # else:
-    #     to_draw = torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape)
+        fig.savefig(save_dir / f"{image_name}_{step:>06d}.png")
+        print(f"Saved {image_name} into {save_dir}")
 
-    to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
-
-    # min_val = y.min()
-    # max_val = y.max()
-    # y = (y - min_val) / (max_val - min_val)
-    # # Rescale to the range [-1, 1]
-    # y = y * 2 - 1
-    # to_draw = torch.clamp(torch.cat([x.unsqueeze(1), y.unsqueeze(1)], 1).view(-1, *im_shape), -1.0, 1.0)
-    if invert:
-        to_draw = 1.0 - to_draw
-    pad_value = 1.0 if invert else 0.0
-    if not use_wandb:
-        tv.utils.save_image(to_draw, p, normalize=True, nrow=nrow, pad_value=pad_value)
+    if use_wandb:
+        distr_dict = {image_name: wandb.Image(fig)}
+        plt.close(fig)
+        return distr_dict
     else:
-        SB_torch_grid = tv.utils.make_grid(to_draw, nrow=nrow, pad_value=pad_value, normalize=False)
-        SB_images = wandb.Image(SB_torch_grid, caption="first: X, second: Y")
-        wandb.log(
-            {im_name: [SB_images]},
-            step=n_step,
-        )
+        plt.show()
 
 
 # plot diagnostics for learning
