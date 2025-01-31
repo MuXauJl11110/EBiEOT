@@ -6,7 +6,12 @@ from matplotlib import pyplot as plt
 import wandb
 from src.costs.lse import BaseLSECost
 from src.models.gmm_based import GMMEOT
-from src.plotting.distributions import pca
+
+
+def pca(input: torch.Tensor, k: int = 2) -> torch.Tensor:
+    input = input.flatten(1)
+    *_, V = torch.pca_lowrank(input, q=k)
+    return input @ V[:, :k]
 
 
 def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, wandb.Image] | None:
@@ -78,7 +83,7 @@ def plot_B_parameters(
         axes[0].set_title(r"$\log{v_m(x)}$")
         axes[0].grid(zorder=-20)
 
-        if cost.y_dim != 2:
+        if cost.y_dim != 2 and cost.m_potentials > 1:
             b_m_i = pca(b_m[i], 2).cpu().detach().numpy()
         else:
             b_m_i = b_m[i].cpu().detach().numpy()
@@ -114,6 +119,7 @@ def plot_Z_parameters(
     elif X_paired is None and Y_paired is None:
         # num_subplots = 5
         fig, axes = plt.subplots(1, 5, figsize=(25, 5), dpi=200, squeeze=False)
+        axes = axes.reshape(-1)
     else:
         raise ValueError("X_paired and Y_paired must be None or not None simultaneously!")
 

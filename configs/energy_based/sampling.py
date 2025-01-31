@@ -7,7 +7,7 @@ from pydantic import BaseModel, model_validator
 class LangevinConfig(BaseModel):
     thresh: float | None = None
     step_size: float = 0.05
-    noise: float = 0.05
+    noise: float = 1e-2
     num_iterations: int = 100
     decay: float = 1.0
     score_coefficient: float = 1.0

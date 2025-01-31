@@ -43,16 +43,16 @@ def sample_langevin_batch(
     Overall, langevin step looks as:
     Y_{t + 1} = Y_{t} + 0.5 * step_size * score(Y_{t}) + noise * N(0, 1)
     """
-    # make step and noise to be data-dimensional
+    # make step and noise data-dimensional
     batch_size = y.size(0)
     sampling_step = torch.full((batch_size,), step_size, device=y.device)  # [bs]
     sampling_noise = torch.full((batch_size,), noise, device=y.device)  # [bs]
 
-    # statistics
-    r_t = torch.zeros(1).to(y.device)
-    cost_r_t = torch.zeros(1).to(y.device)
-    score_r_t = torch.zeros(1).to(y.device)
-    noise_t = torch.zeros(1).to(y.device)
+    # Initialize statistics
+    r_t = torch.tensor(0.0, device=y.device)
+    cost_r_t = torch.tensor(0.0, device=y.device)
+    score_r_t = torch.tensor(0.0, device=y.device)
+    noise_t = torch.tensor(0.0, device=y.device)
 
     # langevin iterations
     for _ in range(num_iterations):
@@ -64,20 +64,22 @@ def sample_langevin_batch(
             step = sampling_step
             noise = sampling_noise
         else:
-            score_norms = torch.norm(score, dim=1)  # [bs]
+            score_norms = torch.norm(score.view(batch_size, -1), dim=1)  # [bs]
             scaling_factors = torch.clamp(thresh / score_norms, max=1.0)
             step = sampling_step * scaling_factors  # [bs]
-            noise = sampling_noise * torch.sqrt(scaling_factors)[:, None]  # [bs]
+            noise = sampling_noise * torch.sqrt(scaling_factors)  # [bs]
 
         # Langevin dynamics
-        y = y + 0.5 * step[:, None] * score + noise[:, None] * z_t
+        step = step.view(-1, *([1] * (y.dim() - 1)))  # [:, None]
+        noise = step.view(-1, *([1] * (y.dim() - 1)))  # [:, None]
+        y = y + 0.5 * step * score + noise * z_t
 
-        # stats calculation
+        # Stats calculation
         if compute_stats:
-            r_t += (0.5 * step * torch.norm(score, dim=1)).mean()
-            cost_r_t += (0.5 * step * torch.norm(cost_part, dim=1)).mean()
-            score_r_t += (0.5 * step * torch.norm(score_part, dim=1)).mean()
-            noise_t += (noise * torch.norm(z_t, dim=1)).mean()
+            r_t += (0.5 * torch.linalg.vector_norm(step * score, dim=list(range(1, y.dim())))).mean()
+            cost_r_t += (0.5 * torch.linalg.vector_norm(step * cost_part, dim=list(range(1, y.dim())))).mean()
+            score_r_t += (0.5 * torch.linalg.vector_norm(step * score_part, dim=list(range(1, y.dim())))).mean()
+            noise_t += (torch.linalg.vector_norm(noise * z_t, dim=list(range(1, y.dim())))).mean()
 
         sampling_step *= decay
         sampling_noise *= np.sqrt(decay)

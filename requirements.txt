@@ -1,7 +1,7 @@
 gensim==4.3.2
 matplotlib==3.9.2
 nflows==0.14
-numpy==2.1.1
+numpy==2.1.1 # Revise this version
 pandas==2.2.3
 papermill==2.6.0
 Pillow==10.4.0

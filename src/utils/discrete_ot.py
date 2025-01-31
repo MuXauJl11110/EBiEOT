@@ -5,6 +5,7 @@ from typing import Optional
 import numpy as np
 import ot as pot
 import torch
+from torchmetrics.functional import pairwise_cosine_similarity
 
 
 class OTPlanSampler:
@@ -32,7 +33,7 @@ class OTPlanSampler:
         reg_m : float (default : 1.0)
             Marginal relaxation term for unbalanced OT (`method='unbalanced'`).
         cost_function : str (default : "l2")
-            Which cost should be used. Can be one of "l2", "anti-l2", "rotation", "rotation-v2".
+            Which cost should be used. Can be one of "l2", "anti-l2", "rotation", "rotation-v2", "cosine".
         normalize_cost : bool (default : False)
             Whether to normalize the cost matrix by its maximum value.
             It should be set to `False` when using minibatches.
@@ -105,6 +106,8 @@ class OTPlanSampler:
                 ]
             )
             M = torch.min(torch.cdist(x0, -x1 @ rotation_matrix_A), torch.cdist(x0, -x1 @ rotation_matrix_B))
+        elif self.cost_function == "cosine":
+            M = pairwise_cosine_similarity(x0, x1)
         else:
             raise ValueError(f"Unkown cost function: {self.cost_function}!")
         if self.normalize_cost:
@@ -190,8 +193,8 @@ class OTPlanSampler:
         return (
             x0[i],
             x1[j],
-            y0[i] if y0 is not None else None,
-            y1[j] if y1 is not None else None,
+            [y0[ind] for ind in i] if y0 is not None else None,
+            [y1[ind] for ind in j] if y1 is not None else None,
         )
 
     def sample_trajectory(self, X):

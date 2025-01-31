@@ -20,14 +20,15 @@ def generate_paired_data(
     file_postfix: str,
     mini_batch_size: int = 64,
     device: str = "cuda",
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    if not os.path.exists(os.path.join(save_dir, f"X_paired_train_{file_postfix}.pt")):
+    split: str = "train",
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not os.path.exists(os.path.join(save_dir, f"X_paired_{split}_{file_postfix}.pt")):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
 
         X_paired_list, Y_paired_list = [], []
 
-        for _ in tqdm(range(2 * num_samples)):  # the first part for train, another for test
+        for _ in tqdm(range(num_samples)):  # the first part for train, another for test
             _X_paired, _Y_paired = X_sampler.sample(mini_batch_size), Y_sampler.sample(mini_batch_size)
             _X_paired, _Y_paired = mini_batch_sampler.sample_plan(_X_paired, _Y_paired)
             X_paired_list.append(_X_paired[0])
@@ -35,30 +36,17 @@ def generate_paired_data(
 
         X_paired, Y_paired = torch.stack(X_paired_list), torch.stack(Y_paired_list)
 
-        torch.save(X_paired[:num_samples], os.path.join(save_dir, f"X_paired_train_{file_postfix}.pt"))
-        torch.save(Y_paired[:num_samples], os.path.join(save_dir, f"Y_paired_train_{file_postfix}.pt"))
-        torch.save(X_paired[num_samples:], os.path.join(save_dir, f"X_paired_test_{file_postfix}.pt"))
-        torch.save(Y_paired[num_samples:], os.path.join(save_dir, f"Y_paired_test_{file_postfix}.pt"))
-
-        X_paired_train = X_paired[:num_samples]
-        Y_paired_train = Y_paired[:num_samples]
-        X_paired_test = X_paired[num_samples:]
-        Y_paired_test = Y_paired[num_samples:]
+        torch.save(X_paired, os.path.join(save_dir, f"X_paired_{split}_{file_postfix}.pt"))
+        torch.save(Y_paired, os.path.join(save_dir, f"Y_paired_{split}_{file_postfix}.pt"))
     else:
-        X_paired_train = torch.load(
-            os.path.join(save_dir, f"X_paired_train_{file_postfix}.pt"), map_location=device, weights_only=True
+        X_paired = torch.load(
+            os.path.join(save_dir, f"X_paired_{split}_{file_postfix}.pt"), map_location=device, weights_only=True
         )
-        Y_paired_train = torch.load(
-            os.path.join(save_dir, f"Y_paired_train_{file_postfix}.pt"), map_location=device, weights_only=True
-        )
-        X_paired_test = torch.load(
-            os.path.join(save_dir, f"X_paired_test_{file_postfix}.pt"), map_location=device, weights_only=True
-        )
-        Y_paired_test = torch.load(
-            os.path.join(save_dir, f"Y_paired_test_{file_postfix}.pt"), map_location=device, weights_only=True
+        Y_paired = torch.load(
+            os.path.join(save_dir, f"Y_paired_{split}_{file_postfix}.pt"), map_location=device, weights_only=True
         )
 
-    return X_paired_train, Y_paired_train, X_paired_test, Y_paired_test
+    return X_paired, Y_paired
 
 
 def get_paired_sampler(
