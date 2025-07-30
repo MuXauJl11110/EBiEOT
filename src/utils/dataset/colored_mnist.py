@@ -68,6 +68,31 @@ def download_digit_images(
     return [data[i][0] for i in indices][:num_digits]
 
 
+# def get_paired_digits(
+#     source_data: list[torch.Tensor],
+#     target_data: list[torch.Tensor],
+#     num_pairs: int,
+#     hue_offset: int = 120,
+#     device: str = "cuda",
+# ) -> tuple[torch.Tensor, torch.Tensor]:
+#     """Generates paired digit samples with random color transformations."""
+#     num_pairs = min(num_pairs, len(source_data), len(target_data))
+
+#     paired_source_samples = []
+#     paired_target_samples = []
+
+#     for src_data, tgt_data in zip(source_data[:num_pairs], target_data[:num_pairs]):
+#         src_hue = 360 * torch.rand(1)
+#         tgt_hue = (src_hue + hue_offset) % 360
+#         paired_source_samples.append(apply_random_color(src_data, src_hue.to(src_data.device)))
+#         paired_target_samples.append(apply_random_color(tgt_data, tgt_hue.to(tgt_data.device)))
+
+#     q_x_paired = torch.stack(paired_source_samples).to(device)
+#     q_y_paired = torch.stack(paired_target_samples).to(device)
+
+#     return q_x_paired, q_y_paired
+
+
 def get_paired_digits(
     source_data: list[torch.Tensor],
     target_data: list[torch.Tensor],
@@ -75,17 +100,24 @@ def get_paired_digits(
     hue_offset: int = 120,
     device: str = "cuda",
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Generates paired digit samples with random color transformations."""
+    """Generates paired digit samples with random color transformations,
+    where half are hue-shifted by +offset and half by -offset (modulo 360)."""
     num_pairs = min(num_pairs, len(source_data), len(target_data))
 
     paired_source_samples = []
     paired_target_samples = []
 
-    for src_data, tgt_data in zip(source_data[:num_pairs], target_data[:num_pairs]):
-        src_hue = 360 * torch.rand(1)
-        tgt_hue = (src_hue + hue_offset) % 360
-        paired_source_samples.append(apply_random_color(src_data, src_hue.to(src_data.device)))
-        paired_target_samples.append(apply_random_color(tgt_data, tgt_hue.to(tgt_data.device)))
+    # Define signs: half +1, half -1
+    signs = torch.tensor([1] * (num_pairs // 2) + [-1] * (num_pairs - num_pairs // 2))
+    signs = signs[torch.randperm(num_pairs)]  # Shuffle to randomize order
+
+    for i, (src_data, tgt_data) in enumerate(zip(source_data[:num_pairs], target_data[:num_pairs])):
+        src_hue = 360 * torch.rand(1, device=src_data.device)
+        sign = signs[i]
+        tgt_hue = (src_hue + sign * hue_offset) % 360
+
+        paired_source_samples.append(apply_random_color(src_data, src_hue))
+        paired_target_samples.append(apply_random_color(tgt_data, tgt_hue))
 
     q_x_paired = torch.stack(paired_source_samples).to(device)
     q_y_paired = torch.stack(paired_target_samples).to(device)

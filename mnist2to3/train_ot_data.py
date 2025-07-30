@@ -14,9 +14,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from comet_ml import Experiment
 from tqdm import tqdm
 
-import wandb
 from configs.energy_based.model import EBMConfig
 from mnist2to3.utils import plot_diagnostics, plot_images, steps_counter
 from src.costs.convolutional import NonlocalCost, UNetCost, VanillaCost
@@ -52,9 +52,9 @@ EXP_DIR = "./out_data/{}/".format(EXP_NAME)
 # json file with experiment config
 CONFIG_FILE = "./config_locker/{}.json".format(EXP_NAME)
 FROM_ITERATION = args.from_iteration
-EVAL = True
+EVAL = False  # True
 FULL_DEVICE = args.device
-USE_WANDB = False
+USE_WANDB = True
 
 
 #######################
@@ -288,8 +288,12 @@ r_s_t_record = torch.zeros(config["num_train_iters"]).to(
 )  # average image gradient magnitude along Langevin path
 
 if USE_WANDB:
-    wandb.init(name=EXP_NAME, project=WANDB_PROJECT_NAME, reinit=True, config=config)
-    print("WandB has initialized.")
+    # wandb.init(name=EXP_NAME, project=WANDB_PROJECT_NAME, reinit=True, config=config)
+    # print("WandB has initialized.")
+    experiment = Experiment(project_name=WANDB_PROJECT_NAME)
+    experiment.set_name(EXP_NAME)
+    experiment.log_parameters(config)
+    print("Comet ML has initialized.")
 
 EVAL_RANDOM_INPUT = False
 EVAL_FROM_GIVEN_X = True
@@ -404,7 +408,8 @@ else:
                 "cost": paired_loss.detach().data,
                 "cost_grad_s_t": cost_grad_s_t,
             }
-            wandb.log({"train": res_dict}, step=i)
+            # wandb.log({"train": res_dict}, step=i)
+            experiment.log_metrics(res_dict, step=i)
 
         # print and save learning info
         if (i + 1) == 1 or (i + 1) % config["log_freq"] == 0:
@@ -425,24 +430,24 @@ else:
                         s_t_0_inds=s_t_0_inds,
                         init_type=config["shortrun_init"],
                     )
-            pbuff_dict = plot_images(
-                f"pairs x->y, pbuff init",
-                x_s_t,
+            plot_images(
+                image_name=f"pairs x->y, pbuff init",
+                source_tensor=x_s_t,
                 target_tensor=y_s_t,
                 step=i + 1,
-                use_wandb=USE_WANDB,
+                experiment=experiment,
                 save_dir=Path(EXP_DIR) / "shortrun",
             )
             # WARNING: work only for unet potential
-            cost_dict = plot_images(
+            plot_images(
                 f"pairs x->g(x)",
                 x_s_t,
                 target_tensor=model.cost.net(x_s_t),
                 step=i + 1,
-                use_wandb=USE_WANDB,
+                experiment=experiment,
                 save_dir=Path(EXP_DIR) / "shortrun",
             )
-            wandb.log(pbuff_dict | cost_dict, step=i)
+            # wandb.log(pbuff_dict | cost_dict, step=i)
 
             if config["shortrun_init"] == "persistent":
                 plot_images(
@@ -450,7 +455,7 @@ else:
                     s_t_0[0 : config["batch_size"]],
                     step=i,
                     save_dir=EXP_DIR + "shortrun/" + "y_s_t_0_{:>06d}.png".format(i + 1),
-                    use_wandb=USE_WANDB,
+                    experiment=experiment,
                 )
             # save network weights
             torch.save(model.state_dict(), EXP_DIR + "checkpoints/" + "model_{:>06d}.pth".format(i + 1))
@@ -483,15 +488,15 @@ else:
                         s_t_0_inds=s_t_0_inds,
                         update_s_t_0=False,
                     )
-                longrun_dict = plot_images(
+                plot_images(
                     f"pairs x->y, longrun, {init_type} init",
                     x_p_theta,
                     target_tensor=y_p_theta,
                     step=i + 1,
-                    use_wandb=USE_WANDB,
+                    experiment=experiment,
                     save_dir=Path(EXP_DIR) / "longrun",
                 )
-                wandb.log(longrun_dict, step=i)
+                # wandb.log(longrun_dict, step=i)
                 print("{:>6d}   Long-run samples for init {} saved.".format(i + 1, init_type))
 
         # WARNING: To reduce memory leakage

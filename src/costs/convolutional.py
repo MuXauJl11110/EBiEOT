@@ -4,7 +4,7 @@ from torchvision.transforms import functional
 
 from src.auxiliary_models.convolutional import NonlocalNet, VanillaNet
 from src.auxiliary_models.resnet import ResNet_D
-from src.auxiliary_models.unet import UNet
+from src.auxiliary_models.unet import UNet2
 from src.costs.base import BaseCost
 
 
@@ -39,7 +39,7 @@ class UNetCost(BaseCost):
     def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
         super().__init__()
         self.net = nn.Sequential(
-            UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters), nn.Tanh()
+            UNet2(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters), nn.Tanh()
         )
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
@@ -49,7 +49,7 @@ class UNetCost(BaseCost):
 class UNetV2Cost(BaseCost):
     def __init__(self, n_c: int = 3, num_layers: int = 3, base_filters: int = 64):
         super().__init__()
-        self.net = UNet(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
+        self.net = UNet2(in_channels=n_c, out_channels=n_c, num_layers=num_layers, base_filters=base_filters)
 
     def func(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:  # [1]
         return (self.net(x.unsqueeze(0)) - y.roll(shifts=-1, dims=0).unsqueeze(0)).square().mean()
