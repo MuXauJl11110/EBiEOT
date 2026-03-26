@@ -5,12 +5,11 @@ import matplotlib.cm as cm
 import numpy as np
 import torch
 import torch.nn as nn
-import wandb
+from comet_ml import Experiment
 from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
-
 from src.samplers.primary import GridGaussiansSampler, Sampler
 
 
@@ -21,8 +20,8 @@ def plot_gaussians(
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
     num_samples: int = 256,
-    log: bool = False,
-) -> dict[str, wandb.Image] | None:
+    experiment: Experiment | None = None,
+) -> None:
     num_gaussians = len(X_sampler.mu)
     colors = cm.rainbow(np.linspace(0, 1, num_gaussians))
     fig, axes = plt.subplots(1, 4, figsize=(20, 5), dpi=200)
@@ -76,10 +75,9 @@ def plot_gaussians(
 
     fig.tight_layout(pad=0.1)
 
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
+    if experiment is not None:
+        experiment.log_figure(figure_name="Distribution", figure=fig)
         plt.close(fig)
-        return distr_dict
     else:
         plt.show()
 
@@ -91,8 +89,8 @@ def plot_PCA(
     paired_source_data: torch.Tensor,
     paired_target_data: torch.Tensor,
     lims: tuple[tuple] = ((-25, 50), (-25, 30)),
-    log: bool = False,
-) -> dict[str, wandb.Image] | None:
+    experiment: Experiment | None = None,
+) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(12, 4), squeeze=True, sharex=True, sharey=True)
     pca = PCA(n_components=2).fit(target_data.cpu().numpy())
 
@@ -155,10 +153,9 @@ def plot_PCA(
 
     fig.tight_layout(pad=0.5)
 
-    if log:
-        distr_dict = {"PCA samples": wandb.Image(fig)}
+    if experiment is not None:
+        experiment.log_figure(figure_name="PCA samples", figure=fig)
         plt.close(fig)
-        return distr_dict
     else:
         plt.show()
 
@@ -176,9 +173,9 @@ def plot_swiss_roll(
     x_lim: tuple[float, float] = (-2.5, 2.5),
     y_lim: tuple[float, float] = (-2.5, 2.5),
     arrows_num: int = 8,
-    log: bool = False,
+    experiment: Experiment | None = None,
     save_dir: str | None = None,
-) -> dict[str, wandb.Image] | None:
+) -> None:
     num_starting_points = len(starting_points)
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
     num_subplots = 3 + len(models_dict)
@@ -376,10 +373,9 @@ def plot_swiss_roll(
             fig.savefig(filename, bbox_inches=extent.expanded(1.2, 1.2))
             print(f"Saved {filename}")
 
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
+    if experiment is not None:
+        experiment.log_figure(figure_name="Distribution", figure=fig)
         plt.close(fig)
-        return distr_dict
     else:
         plt.show()
 
@@ -397,7 +393,7 @@ def get_transport_plot_pca(
     moved_samples: torch.Tensor,
     *,
     colors=None,
-    log=False,
+    experiment: Experiment | None = None,
     **figure_kwargs,
 ):
     if source_samples.size(1) != 2:
@@ -421,10 +417,9 @@ def get_transport_plot_pca(
     target_axis.set_title("Target space")
     target_axis.legend()
 
-    if log:
-        mapping_dict = {"Mapping": wandb.Image(figure)}
+    if experiment is not None:
+        experiment.log_figure(figure_name="Mapping", figure=figure)
         plt.close(figure)
-        return mapping_dict
     else:
         plt.show()
         return

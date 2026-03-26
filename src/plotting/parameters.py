@@ -1,15 +1,15 @@
 import matplotlib.cm as cm
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
-
 import wandb
+from comet_ml import Experiment
+from matplotlib import pyplot as plt
 from src.costs.lse import BaseLSECost
 from src.models.gmm_based import GMMEOT
 from src.plotting.distributions import pca
 
 
-def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, wandb.Image] | None:
+def plot_A_parameters(model: GMMEOT, experiment: Experiment | None = None) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
     color = cm.rainbow(np.linspace(0.1, 0.9, 1))
 
@@ -46,17 +46,16 @@ def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, wandb.Image
     axes[2].set_title(r"$A_n$")
     axes[2].grid(zorder=-20)
 
-    if log:
-        A_dict = {"A parameters": wandb.Image(fig)}
+    fig.tight_layout(pad=0.1)
+
+    if experiment is not None:
+        experiment.log_figure(figure_name="A parameters", figure=fig)
         plt.close(fig)
-        return A_dict
     else:
         plt.show()
 
 
-def plot_B_parameters(
-    cost: BaseLSECost, starting_points: torch.Tensor, log: bool = False
-) -> dict[str, wandb.Image] | None:
+def plot_B_parameters(cost: BaseLSECost, starting_points: torch.Tensor, experiment: Experiment | None) -> None:
     num_subplots = 2
     fig, axes = plt.subplots(1, num_subplots, figsize=(5 * num_subplots, 5), dpi=200)
 
@@ -93,10 +92,10 @@ def plot_B_parameters(
         ax.legend(loc="lower right")
 
     fig.tight_layout(pad=0.1)
-    if log:
-        B_dict = {"B parameters": wandb.Image(fig)}
+
+    if experiment is not None:
+        experiment.log_figure(figure_name="B parameters", figure=fig)
         plt.close(fig)
-        return B_dict
     else:
         plt.show()
 
@@ -106,7 +105,7 @@ def plot_Z_parameters(
     starting_points: torch.Tensor,
     X_paired: torch.Tensor | None = None,
     Y_paired: torch.Tensor | None = None,
-    log: bool = False,
+    experiment: Experiment | None = None,
 ) -> dict[str, wandb.Image] | None:
     if X_paired is not None and Y_paired is not None:
         fig, axes = plt.subplots(2, 4, figsize=(20, 10), dpi=200)
@@ -272,9 +271,9 @@ def plot_Z_parameters(
         ax.legend(loc="lower right")
 
     fig.tight_layout(pad=0.1)
-    if log:
-        Z_dict = {"Z parameters": wandb.Image(fig)}
+
+    if experiment is not None:
+        experiment.log_figure(figure_name="Z parameters", figure=fig)
         plt.close(fig)
-        return Z_dict
     else:
         plt.show()
