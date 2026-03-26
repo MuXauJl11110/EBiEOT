@@ -1,14 +1,15 @@
 import os
 import random
+from pathlib import Path
+from typing import Any, Callable
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
-
 from src.samplers.base import Sampler
 from src.samplers.from_loader import PairedLoaderSampler, PairedWithLabelsLoaderSampler
 from src.utils.discrete_ot import OTPlanSampler
+from torch.utils.data import DataLoader, TensorDataset
+from tqdm import tqdm
 
 
 def generate_paired_data(
@@ -121,3 +122,76 @@ def get_paired_with_labels_sampler(
         **loader_kwargs,
     )
     return PairedWithLabelsLoaderSampler(paired_loader, device=device)
+
+
+def get_point_filename(point: np.ndarray) -> str:
+    return f"point_{point[0]:.4f}_{point[1]:.4f}.npz"
+
+
+def save_gt_points(
+    starting_points: torch.Tensor, gt_Y_points: list[np.ndarray], target_dir: str = "./data/sinkhorn_points"
+):
+    """Saves each ground truth array to a separate file named by its starting point."""
+    target_dir = Path(target_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    for point_tensor, gt_Y in zip(starting_points, gt_Y_points):
+        point_np = point_tensor.cpu().numpy()
+        filename = get_point_filename(point_np)
+        target_path = target_dir / filename
+
+        # Save with a fixed key 'data' for easy retrieval
+        np.savez_compressed(target_path, data=gt_Y)
+        print(f"Successfully saved: {target_path.name}")
+
+
+def load_or_compute_gt_points(
+    starting_points: torch.Tensor,
+    X_sampler: Any,
+    Y_sampler: Any,
+    otp_sampler: Any,
+    compute_func: Callable,
+    target_dir: str = "./data/sinkhorn_points",
+    num_ending_points: int = 1024,
+) -> list[np.ndarray]:
+    """
+    Loads points from disk. If any points are missing, computes them using
+    the provided samplers and saves them before returning the full list.
+    """
+    target_path = Path(target_dir)
+    target_path.mkdir(parents=True, exist_ok=True)
+
+    results = [None] * len(starting_points)
+    indices_to_compute = []
+    points_to_compute = []
+
+    # 1. Check disk for existing points
+    for i, point_tensor in enumerate(starting_points):
+        point_np = point_tensor.cpu().numpy()
+        file_path = target_path / get_point_filename(point_np)
+
+        if file_path.exists():
+            with np.load(file_path) as loader:
+                results[i] = loader["data"]
+        else:
+            indices_to_compute.append(i)
+            points_to_compute.append(point_tensor)
+
+    # 2. Compute missing points if necessary
+    if points_to_compute:
+        print(f"Missing {len(points_to_compute)} points. Computing...")
+        # Convert list of tensors back to a single batch tensor
+        batch_to_compute = torch.stack(points_to_compute)
+
+        new_gt_points = compute_func(
+            X_sampler, Y_sampler, otp_sampler, batch_to_compute, num_ending_points=num_ending_points
+        )
+
+        # 3. Save newly computed points
+        save_gt_points(batch_to_compute, new_gt_points, target_path)
+
+        # 4. Fill results list
+        for idx, gt_data in zip(indices_to_compute, new_gt_points):
+            results[idx] = gt_data
+
+    return results
