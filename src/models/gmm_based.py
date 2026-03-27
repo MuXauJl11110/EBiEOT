@@ -1,12 +1,11 @@
 import torch
+from src.costs.lse import BaseLSECost
+from src.models.base import BaseGenerativeModel
 from torch import nn
 from torch.distributions.categorical import Categorical
 from torch.distributions.independent import Independent
 from torch.distributions.mixture_same_family import MixtureSameFamily
 from torch.distributions.normal import Normal
-
-from src.costs.lse import BaseLSECost
-from src.models.base import BaseGenerativeModel
 
 
 class GMMEOT(BaseGenerativeModel):

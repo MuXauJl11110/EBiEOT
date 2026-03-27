@@ -2,7 +2,6 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
-
 from src.auxiliary_models.mlp_based import FullyConnectedMLP
 from src.potentials.base import BasePotential
 

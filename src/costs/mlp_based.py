@@ -2,8 +2,6 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
 from src.auxiliary_models.mlp_based import FullyConnectedMLP
 from src.costs.base import BaseCost
 

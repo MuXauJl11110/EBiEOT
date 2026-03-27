@@ -13,4 +13,5 @@ class TrainConfig(BaseModel):
     steps_to: int = 100000
 
     ema_update: bool = False
+    log_every: int = 50
     plot_every: int = 1000
