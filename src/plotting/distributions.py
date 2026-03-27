@@ -167,7 +167,7 @@ def plot_swiss_roll(
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
     starting_points: torch.Tensor,
-    gt_Y_points: list[np.ndarray],
+    gt_Y_points: torch.Tensor,
     num_ending_points: int = 64,
     num_samples: int = 1024,
     x_lim: tuple[float, float] = (-2.5, 2.5),
@@ -256,8 +256,8 @@ def plot_swiss_roll(
             marker="s",
         )
         axes[2].scatter(
-            gt_point[:, 0],
-            gt_point[:, 1],
+            gt_point[:, 0].cpu().numpy(),
+            gt_point[:, 1].cpu().numpy(),
             color=color,
             s=32,
             zorder=3,
@@ -267,7 +267,11 @@ def plot_swiss_roll(
         indices = random.choices(range(gt_point.shape[0]), k=arrows_num)
         for y in gt_point[indices]:
             axes[2].arrow(
-                point[0].item(), point[1].item(), y[0] - point[0].item(), y[1] - point[1].item(), color="black"
+                point[0].item(),
+                point[1].item(),
+                y[0].item() - point[0].item(),
+                y[1].item() - point[1].item(),
+                color="black",
             )
         legend_start.append(
             Line2D([0], [0], marker="s", color="w", markerfacecolor=color, markeredgecolor="black", markersize=8)

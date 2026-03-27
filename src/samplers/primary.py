@@ -1,29 +1,61 @@
 import numpy as np
 import torch
-from sklearn import datasets
+from src.samplers.base import Sampler
+from torch import Generator
 from torch.distributions.multivariate_normal import MultivariateNormal
 
-from src.samplers.base import Sampler
+
+def swiss_roll_transform(
+    t: torch.Tensor,
+    generator: Generator,
+    noise: float = 0.0,
+) -> torch.Tensor:
+    """
+    Maps parameter t → 2D swiss roll with optional isotropic noise.
+    """
+    x = t * torch.cos(t)
+    z = t * torch.sin(t)
+
+    X = torch.stack((x, z), dim=1)
+
+    if noise > 0:
+        X = X + noise * torch.randn(size=X.shape, generator=generator)
+
+    return X
 
 
 class SwissRollSampler(Sampler):
-    def __init__(self, dim: int = 2, device: str = "cuda", dtype: torch.dtype = torch.float32):
-        super(SwissRollSampler, self).__init__(device=device)
+    def __init__(
+        self,
+        dim: int = 2,
+        noise: float = 0.8,
+        scale: float = 7.5,
+        t_min: float = 1.5 * np.pi,
+        t_max: float = 4.5 * np.pi,
+        generator: Generator | None = None,
+        device: str = "cuda",
+    ):
+        super().__init__(generator=generator, device=device)
         assert dim == 2
-        self.dim = 2
-        self.dtype = dtype
+
+        self.noise = noise
+        self.scale = scale
+        self.t_min = t_min
+        self.t_max = t_max
 
     def sample(self, batch_size: int = 10):
-        if self.dtype == torch.float32:
-            batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0].astype("float32")[:, [0, 2]] / 7.5
-        else:
-            batch = datasets.make_swiss_roll(n_samples=batch_size, noise=0.8)[0][:, [0, 2]] / 7.5
-        return torch.tensor(batch, device=self.device)
+        diff = self.t_max - self.t_min
+
+        t = self.t_min + diff * torch.rand((batch_size,), generator=self.generator, device=self.device)
+
+        batch = swiss_roll_transform(t=t, generator=self.generator, noise=self.noise) / self.scale
+
+        return batch
 
 
 class StandardNormalSampler(Sampler):
-    def __init__(self, dim: int = 1, device: str = "cuda"):
-        super(StandardNormalSampler, self).__init__(device=device)
+    def __init__(self, dim: int = 1, generator: Generator | None = None, device: str = "cuda"):
+        super(StandardNormalSampler, self).__init__(generator=generator, device=device)
         self.dim = dim
 
     def sample(self, batch_size: int = 10):

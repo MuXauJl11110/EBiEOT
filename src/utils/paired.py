@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from src.samplers.base import Sampler
 from src.samplers.from_loader import PairedLoaderSampler, PairedWithLabelsLoaderSampler
+from src.samplers.primary import SwissRollSampler, swiss_roll_transform
 from src.utils.discrete_ot import OTPlanSampler
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
@@ -67,7 +68,7 @@ def get_paired_sampler(
 ) -> PairedLoaderSampler:
     assert len(X_paired) == len(Y_paired)
     loader_kwargs = {"num_workers": 0, "generator": torch.Generator(device=X_paired.device)}
-    ind = random.choices(range(len(X_paired)), k=min(num_samples, len(X_paired)))
+    ind = torch.randperm(len(X_paired), device=X_paired.device)[:num_samples]
     paired_loader = DataLoader(
         TensorDataset(X_paired[ind], Y_paired[ind]),
         batch_size=min(batch_size, num_samples),
@@ -97,6 +98,46 @@ def get_GT_points(
         gt_Y_points.append(np.array(_gt_points))
 
     return gt_Y_points
+
+
+def match_gaussian_and_swiss_roll(
+    Y_sampler: SwissRollSampler,
+    starting_points: list[torch.Tensor],
+    num_ending_points: int = 64,
+    g_func: Callable[[torch.Tensor], torch.Tensor] | None = None,
+    noise_std: float = 0.1,
+) -> torch.Tensor:
+    assert g_func is not None
+
+    gt_Y_points = []
+
+    generator = Y_sampler.generator
+    t_min = Y_sampler.t_min
+    t_max = Y_sampler.t_max
+    t_mid = 0.5 * (t_min + t_max)
+    scale = Y_sampler.scale
+
+    for point in tqdm(starting_points):
+        n = num_ending_points
+
+        x_batch = point.unsqueeze(0).repeat(n, 1)
+        gx = g_func(x_batch)
+
+        x_norm = torch.norm(gx, dim=-1)
+        base = torch.tanh(x_norm)
+        is_upper = torch.rand(n, device=point.device) > 0.5
+
+        t_lower = t_min + (t_mid - t_min) * base
+        t_upper = t_mid + (t_max - t_mid) * base
+
+        t = torch.where(is_upper, t_upper, t_lower)
+        t = t + noise_std * torch.randn_like(t)
+
+        y_spiral = swiss_roll_transform(t=t, generator=generator, noise=Y_sampler.noise) / scale
+
+        gt_Y_points.append(y_spiral.cpu().numpy())
+
+    return torch.from_numpy(np.stack(gt_Y_points)).to(Y_sampler.device)
 
 
 def get_paired_with_labels_sampler(
