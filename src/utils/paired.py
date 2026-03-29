@@ -114,7 +114,6 @@ def match_gaussian_and_swiss_roll(
     generator = Y_sampler.generator
     t_min = Y_sampler.t_min
     t_max = Y_sampler.t_max
-    t_mid = 0.5 * (t_min + t_max)
     scale = Y_sampler.scale
 
     for point in tqdm(starting_points):
@@ -125,12 +124,8 @@ def match_gaussian_and_swiss_roll(
 
         x_norm = torch.norm(gx, dim=-1)
         base = torch.tanh(x_norm)
-        is_upper = torch.rand(n, device=point.device) > 0.5
 
-        t_lower = t_min + (t_mid - t_min) * base
-        t_upper = t_mid + (t_max - t_mid) * base
-
-        t = torch.where(is_upper, t_upper, t_lower)
+        t = t_min + (t_max - t_min) * base
         t = t + noise_std * torch.randn_like(t)
 
         y_spiral = swiss_roll_transform(t=t, generator=generator, noise=Y_sampler.noise) / scale
