@@ -153,10 +153,12 @@ configs/local/default.yaml
 # Aim logging
 .aim
 
-# Local dirs
+# Local dirs and files
 checkpoints/
 datasets/
 ploomber_notebooks/
 notebooks/wandb
 wandb/
 outputs
+*.pdf
+*.tex

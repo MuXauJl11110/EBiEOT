@@ -1,15 +1,24 @@
-gensim==4.3.2
+# PyTorch: single pin from PyPI (macOS/typical CUDA). For Linux CPU-only wheels:
+#   pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu
+comet_ml==3.45.1
+geomloss==0.2.6
+geotorch==0.3.0
+hydra-core==1.3.2
 matplotlib==3.9.2
 nflows==0.14
 numpy==2.1.1
+omegaconf==2.3.0
+optuna==3.6.1
 pandas==2.2.3
 papermill==2.6.0
 Pillow==10.4.0
+plotly==5.24.1
 POT==0.9.4
+pydantic==2.9.2
 pytest==7.4.4
-scikit_learn==1.5.2
-torch==2.3.1+cpu
+scikit-learn==1.5.2
+scrapbook==0.5.0
 torch==2.3.1
 torchvision==0.18.1
-torchvision==0.18.1+cpu
 tqdm==4.66.4
+wandb==0.18.3

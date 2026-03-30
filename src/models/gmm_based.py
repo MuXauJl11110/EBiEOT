@@ -1,11 +1,13 @@
 import torch
-from src.costs.lse import BaseLSECost
-from src.models.base import BaseGenerativeModel
+import torch.nn.functional as F
 from torch import nn
 from torch.distributions.categorical import Categorical
 from torch.distributions.independent import Independent
 from torch.distributions.mixture_same_family import MixtureSameFamily
 from torch.distributions.normal import Normal
+
+from src.costs.lse import BaseLSECost
+from src.models.base import BaseGenerativeModel
 
 
 class GMMEOT(BaseGenerativeModel):
@@ -41,10 +43,13 @@ class GMMEOT(BaseGenerativeModel):
         assert A_diagonal_init is not None  # TODO: add non-diagonal
         self.sampling_batch_size = sampling_batch_size
 
-        self._log_w_n = nn.Parameter(self.epsilon * torch.log(torch.ones(n_potentials) / n_potentials))
+        self._log_w_n = nn.Parameter(torch.zeros(n_potentials))
         self._a_n = nn.Parameter(torch.randn(n_potentials, y_dim))
         if A_diagonal_init is not None:
-            self._log_A_n = nn.Parameter(torch.log(A_diagonal_init * torch.ones(n_potentials, y_dim)))  # [N x y_dim]
+            # softplus(raw) ≈ A_diagonal_init at t=0
+            self._raw_A_n = nn.Parameter(
+                torch.log(torch.expm1(torch.full((n_potentials, y_dim), float(A_diagonal_init))))
+            )
 
     def init_a_by_samples(self, samples: torch.Tensor):
         assert samples.shape[0] == self._a_n.shape[0]
@@ -52,14 +57,14 @@ class GMMEOT(BaseGenerativeModel):
         self._a_n.data = torch.clone(samples.to(self._a_n.device))
 
     def log_w_n(self):  # -> [N]
-        return (self._log_w_n - torch.logsumexp(self._log_w_n, dim=0)) / self.epsilon
+        return F.log_softmax(self._log_w_n, dim=0)
 
     def a_n(self):  # -> [N x y_dim]
         return self._a_n
 
     def A_n(self):  # -> [N x y_dim]
         if self.A_diagonal_init is not None:
-            A_n = torch.exp(self._log_A_n) + 1e-12
+            A_n = F.softplus(self._raw_A_n) + 1e-12
         else:
             raise NotImplementedError("Other options are not implemented yet!")
         return A_n
@@ -74,9 +79,7 @@ class GMMEOT(BaseGenerativeModel):
             correction = torch.sum(
                 (bT_A + 2 * a_n[None, :, None, :]) * b_m[:, None, :, :], dim=3
             )  # sum(([bs x N x M x y_dim] + [1 x N x 1 x y_dim]) * [bs x 1 x M x y_dim], dim=3) = [bs x N x M]
-            return (
-                log_v_m[:, None, :] + log_w_n[None, :, None] + 0.5 * correction / self.epsilon
-            ) + 1e-12  # [bs x 1 x M] + [1 x N x 1] + [bs x N x M]
+            return log_v_m[:, None, :] + log_w_n[None, :, None] + 0.5 * correction / self.epsilon
         else:
             raise NotImplementedError("Other options are not implemented yet!")
 
@@ -160,7 +163,7 @@ class GMMEOT(BaseGenerativeModel):
     def compute_paired_loss(self, X_paired: torch.Tensor, Y_paired: torch.Tensor) -> dict[str, torch.Tensor]:
         c = self.cost(X_paired, Y_paired)
 
-        return {"loss": c.mean()}
+        return {"loss": c.mean() / self.epsilon}
 
     def compute_unpaired_loss(self, X_unpaired: torch.Tensor, Y_unpaired: torch.Tensor) -> dict[str, torch.Tensor]:
         log_v_m = self.cost.log_v_m(X_unpaired)  # [bs x M]
@@ -173,4 +176,11 @@ class GMMEOT(BaseGenerativeModel):
         f_c = self.f_c(log_w_n, a_n, A_n, log_v_m, b_m)
         f = self.f(Y_unpaired, log_w_n, a_n, A_n)
 
-        return {"log_w_n": log_w_n, "a_n": a_n, "A_n": A_n, "f_c": f_c, "f": f, "loss": -(f_c + f).mean()}
+        return {
+            "log_w_n": log_w_n,
+            "a_n": a_n,
+            "A_n": A_n,
+            "f_c": f_c,
+            "f": f,
+            "loss": -(f_c + f).mean() / self.epsilon,
+        }
