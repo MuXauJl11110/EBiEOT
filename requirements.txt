@@ -1,3 +1,4 @@
+comet_ml
 gensim==4.3.2
 matplotlib==3.9.2
 nflows==0.14

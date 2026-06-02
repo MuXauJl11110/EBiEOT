@@ -19,7 +19,9 @@ class MLPCost(BaseCost):
         :param int x_dim: Dimension of X space, defaults to 2
         :param int y_dim: Dimension of Y space, defaults to 3
         """
-        super().__init__(x_dim, y_dim)
+        super().__init__()
+        self.x_dim = x_dim
+        self.y_dim = y_dim
 
         self.net = FullyConnectedMLP(
             input_dim=x_dim + y_dim, hidden_layers=hidden_layers, output_dim=1, activation_function=activation_function

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from matplotlib import pyplot as plt
 
-import wandb
+from src.plotting.comet_logging import log_matplotlib_figure
 from src.costs.lse import BaseLSECost
 from src.models.gmm_based import GMMEOT
 
@@ -14,7 +14,7 @@ def pca(input: torch.Tensor, k: int = 2) -> torch.Tensor:
     return input @ V[:, :k]
 
 
-def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, wandb.Image] | None:
+def plot_A_parameters(model: GMMEOT, experiment=None, step: int | None = None) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=200)
     color = cm.rainbow(np.linspace(0.1, 0.9, 1))
 
@@ -51,17 +51,18 @@ def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, wandb.Image
     axes[2].set_title(r"$A_n$")
     axes[2].grid(zorder=-20)
 
-    if log:
-        A_dict = {"A parameters": wandb.Image(fig)}
-        plt.close(fig)
-        return A_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "A parameters", fig, step=step)
     else:
         plt.show()
 
 
 def plot_B_parameters(
-    cost: BaseLSECost, starting_points: torch.Tensor, log: bool = False
-) -> dict[str, wandb.Image] | None:
+    cost: BaseLSECost,
+    starting_points: torch.Tensor,
+    experiment=None,
+    step: int | None = None,
+) -> None:
     num_subplots = 2
     fig, axes = plt.subplots(1, num_subplots, figsize=(5 * num_subplots, 5), dpi=200)
 
@@ -98,10 +99,8 @@ def plot_B_parameters(
         ax.legend(loc="lower right")
 
     fig.tight_layout(pad=0.1)
-    if log:
-        B_dict = {"B parameters": wandb.Image(fig)}
-        plt.close(fig)
-        return B_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "B parameters", fig, step=step)
     else:
         plt.show()
 
@@ -111,8 +110,9 @@ def plot_Z_parameters(
     starting_points: torch.Tensor,
     X_paired: torch.Tensor | None = None,
     Y_paired: torch.Tensor | None = None,
-    log: bool = False,
-) -> dict[str, wandb.Image] | None:
+    experiment=None,
+    step: int | None = None,
+) -> None:
     if X_paired is not None and Y_paired is not None:
         fig, axes = plt.subplots(2, 4, figsize=(20, 10), dpi=200)
         axes = axes.reshape(-1)
@@ -278,9 +278,7 @@ def plot_Z_parameters(
         ax.legend(loc="lower right")
 
     fig.tight_layout(pad=0.1)
-    if log:
-        Z_dict = {"Z parameters": wandb.Image(fig)}
-        plt.close(fig)
-        return Z_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "Z parameters", fig, step=step)
     else:
         plt.show()

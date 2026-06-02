@@ -11,15 +11,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
-import wandb
 
 from src.models.light_gcot import LightGCOT
 from src.samplers.from_dataset import DatasetSampler
 from src.samplers.primary import StandardNormalSampler, SwissRollSampler
 from src.utils.discrete_ot import OTPlanSampler
 from src.utils.paired import generate_paired_data, get_GT_points, get_paired_sampler
-from src.utils.plotting.distributions import plot_swiss_roll
-from src.utils.plotting.parameters import (
+from src.plotting.distributions import plot_swiss_roll
+from src.plotting.gmm_parameters import (
     plot_A_parameters,
     plot_B_parameters,
     plot_Z_parameters,
@@ -50,7 +49,6 @@ from src.models.models import ConditionalRealNVP, compat_patch, ConditionalMaske
 
 if __name__ == "__main__":
     device = torch.device("cuda")
-    # os.system('wandb login <your token>')
 
     X_DIM = 2
     Y_DIM = 2
@@ -124,8 +122,6 @@ if __name__ == "__main__":
         N_Y_UNPAIRED_SAMPELS=N_Y_UNPAIRED_SAMPLES,
         L_PAIRED_SAMPLES=L_PAIRED_SAMPLES,
     )
-
-    # wandb.init(name=EXP_NAME, project='inverse_ot', config=config)
 
     X_sampler = StandardNormalSampler(dim=2, device=device)
     Y_sampler = SwissRollSampler(dim=2, device=device, dtype=dtype)
@@ -205,7 +201,6 @@ if __name__ == "__main__":
         T_loss.backward()
         T_opt.step()
 
-        # wandb.log({f"Loss": T_loss}, step=step)
         print(T_loss.item())
 
         if (step+1) % SAVE_EVERY == 0:

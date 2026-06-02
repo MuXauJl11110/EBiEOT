@@ -157,8 +157,8 @@ configs/local/default.yaml
 checkpoints/
 datasets/
 ploomber_notebooks/
-notebooks/wandb
-wandb/
+notebooks/comet_ml
+.cometml-runs/
 outputs/
 ./mnist2to3/data/
 data/

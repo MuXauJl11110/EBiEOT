@@ -11,13 +11,13 @@ import numpy as np
 import torch
 import torchvision.datasets as datasets
 import torchvision.transforms as tr
+from comet_ml import Experiment
 from nets import NonlocalNet, VanillaNet
 
-import wandb
 from src.models.energy_based import EGEOT
 from utils import download_colored_mnist_data, plot_im_pairs, plot_ims
 
-WANDB_PROJECT_NAME = "eot"
+COMET_PROJECT_NAME = "eot"
 
 import os
 import sys
@@ -33,7 +33,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument("experiment", help="experiment name")
-parser.add_argument("--use_wandb", action="store_const", const=True, default=False)
+parser.add_argument("--use_comet", action="store_const", const=True, default=False)
 parser.add_argument("--device", action="store", help="device (for NN training)", type=str, default="cuda:0")
 
 args = parser.parse_args()
@@ -52,7 +52,7 @@ MODEL_NAME = max(ch_files)
 print("run script for MODEL_NAME={}".format(MODEL_NAME))
 MODEL_PATH = "./out_data/{}/checkpoints/{}".format(EXP_NAME, MODEL_NAME)
 FULL_DEVICE = args.device
-USE_WANDB = args.use_wandb
+USE_COMET = args.use_comet
 
 BASIC_RESULT_SAVE_DIR = "./out_eval"
 RESULT_SAVE_DIR = BASIC_RESULT_SAVE_DIR + "/{}/".format(EXP_NAME)
@@ -175,13 +175,16 @@ assert len(basic_inds) == BATCH_SIZE
 __x_s_t_0 = q_x[basic_inds].repeat_interleave(N_PER, 0)
 y_s_t_0, x_s_t_0 = __x_s_t_0.clone(), __x_s_t_0
 
-if USE_WANDB:
-    wandb.init(name=EXP_NAME, project=WANDB_PROJECT_NAME, reinit=True, config=config)
-    print("WandB has initialized.")
+experiment = None
+if USE_COMET:
+    experiment = Experiment(project_name=COMET_PROJECT_NAME)
+    experiment.set_name(EXP_NAME)
+    experiment.log_parameters(config)
+    print("Comet ML has initialized.")
 
 plot_ims(RESULT_SAVE_DIR + "initial_states.png", q_x[basic_inds], nrow=1)
-if USE_WANDB:
-    plot_ims("dummy_name", q_x[basic_inds], im_name="init Ys", n_step=0, use_wandb=USE_WANDB, nrow=1)
+if USE_COMET:
+    plot_ims("dummy_name", q_x[basic_inds], im_name="init Ys", n_step=0, experiment=experiment, nrow=1)
 # plot_im_pairs(RESULT_SAVE_DIR + 'initial_states.png', q_x[basic_inds], y_s_t_0, invert=True, nrow=6)
 config["batch_size"] = BATCH_SIZE * N_PER
 
@@ -217,9 +220,9 @@ def langevin_grad(epss, start_i=0):
                     ell + 1, num_steps, ens[ell].mean(), grads[ell].mean()
                 )
             )
-        if USE_WANDB:
+        if USE_COMET:
             res_dict = {"ens": ens[ell].mean().item(), "grads": grads[ell].mean().item(), "eps": eps}
-            wandb.log({"train": res_dict}, step=ell + start_i)
+            experiment.log_metrics(res_dict, step=ell + start_i)
     return y_s_t.detach(), ens, grads
 
 
@@ -236,13 +239,13 @@ epss = [
 y_s_t, en_record, grad_record = langevin_grad(epss)
 
 plot_ims(RESULT_SAVE_DIR + "interm_sample_states.png", y_s_t, nrow=N_PER)
-if USE_WANDB:
+if USE_COMET:
     plot_ims(
         "dummy_name",
         y_s_t,
         im_name="generated Ys",
         n_step=config["num_longrun_steps"],
-        use_wandb=USE_WANDB,
+        experiment=experiment,
         nrow=N_PER,
     )
 
@@ -255,13 +258,13 @@ y_s_t, en_record, grad_record = langevin_grad(epss, start_i=config["num_longrun_
 
 # visualize initial and synthesized images
 plot_ims(RESULT_SAVE_DIR + "sample_states.png", y_s_t, nrow=N_PER)
-if USE_WANDB:
+if USE_COMET:
     plot_ims(
         "dummy_name",
         y_s_t,
         im_name="finally generated Ys",
         n_step=config["num_longrun_steps"] + N_DECREASE_SAMPLES,
-        use_wandb=USE_WANDB,
+        experiment=experiment,
         nrow=N_PER,
     )
 
@@ -269,3 +272,6 @@ for i, ind in enumerate(basic_inds):
     _im = torch.cat((q_x[basic_inds][i].unsqueeze(0), y_s_t[i * N_PER : (i + 1) * N_PER]), dim=0)
     plot_ims(RESULT_SAVE_DIR + "im{:02d}.png".format(i + 1), _im, nrow=N_PER + 1)
 # plot_im_pairs(RESULT_SAVE_DIR + 'sample_states.png', q_x[basic_inds], y_s_t, invert=True, nrow=6)
+
+if experiment is not None:
+    experiment.end()

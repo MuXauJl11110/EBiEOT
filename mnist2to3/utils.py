@@ -13,8 +13,6 @@ from torchvision import transforms
 
 sys.path.append("../..")
 
-import wandb
-
 
 ##################
 # ## PLOTTING ## #
@@ -29,73 +27,6 @@ def tensor2image(tensor: torch.Tensor, normalize: bool = True, invert: bool = Fa
     tensor = 1 - tensor if invert else tensor
 
     return (tensor * 255).byte()
-
-
-# def plot_images(
-#     image_name: str,
-#     source_tensor: torch.Tensor,
-#     step: int,
-#     target_tensor: torch.Tensor | None = None,
-#     nrow: int | None = None,
-#     invert: bool = False,
-#     clamp: bool = True,
-#     normalize: bool = True,
-#     use_wandb: bool = False,
-#     save_dir: Path | None = None,
-# ):
-#     if target_tensor is not None:
-#         assert source_tensor.shape == target_tensor.shape
-
-#     if nrow is None:
-#         nrow = int(source_tensor.shape[0] ** 0.5)
-#     im_shape = tuple(source_tensor.shape[1:])  # source_tensor: [B, C, H, W]
-
-#     normalize_transorm = transforms.Normalize(mean=[0.5], std=[0.5])
-#     source_tensor = normalize_transorm(source_tensor) if normalize else source_tensor
-#     source_tensor = source_tensor.clamp(-1.0, 1.0) if clamp else source_tensor
-#     source_images = tensor2image(source_tensor, invert=invert)
-#     if target_tensor is not None:
-#         target_tensor = normalize_transorm(target_tensor) if normalize else target_tensor
-#         target_tensor = target_tensor.clamp(-1.0, 1.0) if clamp else target_tensor
-#         target_images = tensor2image(target_tensor, invert=invert)
-#         output_images = torch.stack([source_images, target_images], dim=1).view(-1, *im_shape)
-#     else:
-#         output_images = source_images
-
-#     # pad_value = 1.0 if invert else 0.0
-#     pad_value = 0
-#     grid = tv.utils.make_grid(output_images, nrow=nrow, pad_value=pad_value)
-
-#     fig = plt.figure()
-#     plt.imshow(grid.permute(1, 2, 0).detach().cpu().numpy())
-#     plt.axis("off")
-
-#     # Add column subtitles
-#     columns = ["Column 1", "Column 2", "Column 3", "Column 4"]
-#     for i, col in enumerate(columns):
-#         plt.text(
-#             i * grid.shape[2] // 4 + grid.shape[2] // 8,
-#             -15,
-#             col,
-#             color="black",
-#             ha="center",
-#             va="center",
-#             fontsize=12,
-#             weight="bold",
-#         )
-
-#     if save_dir is not None:
-#         os.makedirs(save_dir, exist_ok=True)
-
-#         fig.savefig(save_dir / f"{image_name}_{step:>06d}.png")
-#         print(f"Saved {image_name} into {save_dir}")
-
-#     if use_wandb:
-#         distr_dict = {image_name: wandb.Image(fig)}
-#         plt.close(fig)
-#         return distr_dict
-#     else:
-#         plt.show()
 
 
 def plot_images(

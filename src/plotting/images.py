@@ -2,10 +2,16 @@ import torch
 from matplotlib import pyplot as plt
 from torchvision.transforms.functional import to_pil_image
 
-import wandb
+from src.plotting.comet_logging import log_matplotlib_figure
 
 
-def plot_images(X: torch.Tensor, Y_pred: torch.Tensor, Y: torch.Tensor, log: bool = False):
+def plot_images(
+    X: torch.Tensor,
+    Y_pred: torch.Tensor,
+    Y: torch.Tensor,
+    experiment=None,
+    step: int | None = None,
+):
     imgs = torch.cat([X, Y_pred, Y]).to("cpu").permute(0, 2, 3, 1).mul(0.5).add(0.5).numpy().clip(0, 1)
     fig, axes = plt.subplots(3, 10, figsize=(15, 4.5), dpi=150)
     for i, ax in enumerate(axes.flatten()):
@@ -18,10 +24,8 @@ def plot_images(X: torch.Tensor, Y_pred: torch.Tensor, Y: torch.Tensor, log: boo
     axes[2, 0].set_ylabel("Y", fontsize=24)
     fig.tight_layout(pad=0.001)
 
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
-        plt.close(fig)
-        return distr_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, figure_name or title, fig, step=step)
     else:
         plt.show()
 
@@ -31,7 +35,9 @@ def plot_samples(
     source_samples: torch.Tensor,
     num_samples: int = 5,
     title: str = "Source and Target Samples",
-    log: bool = False,
+    experiment=None,
+    step: int | None = None,
+    figure_name: str | None = None,
 ):
     """
     Plots `num_samples` source and target samples, one under another.
@@ -59,9 +65,7 @@ def plot_samples(
 
     plt.suptitle(title, fontsize=16)
     plt.tight_layout()
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
-        plt.close(fig)
-        return distr_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "Distribution", fig, step=step)
     else:
         plt.show()

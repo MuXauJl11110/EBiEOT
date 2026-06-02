@@ -4,9 +4,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from src.models.gmm_based import GMMEOT
+from src.plotting.comet_logging import log_plotly_figure
 
 
-def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, go.Figure] | None:
+def plot_A_parameters(model: GMMEOT, experiment=None, step: int | None = None) -> None:
     # Compute data for plots
     log_w_n = model.log_w_n()
     a_n = model.a_n()
@@ -73,8 +74,7 @@ def plot_A_parameters(model: GMMEOT, log: bool = False) -> dict[str, go.Figure] 
     # Update trace
     fig.update_traces(hovertemplate="%{customdata}: (%{x:,.4f}, %{y:,.4f})<extra></extra>")
 
-    if log:
-        A_dict = {"A parameters": fig}
-        return A_dict
+    if experiment is not None:
+        log_plotly_figure(experiment, "A parameters", fig, step=step)
     else:
         fig.show()

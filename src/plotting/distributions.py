@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 
-import wandb
+from src.plotting.comet_logging import log_matplotlib_figure
 from src.samplers.primary import GridGaussiansSampler, Sampler
 
 
@@ -20,8 +20,9 @@ def plot_gaussians(
     X_paired: torch.Tensor,
     Y_paired: torch.Tensor,
     num_samples: int = 256,
-    log: bool = False,
-) -> dict[str, wandb.Image] | None:
+    experiment=None,
+    step: int | None = None,
+) -> None:
     num_gaussians = len(X_sampler.mu)
     colors = cm.rainbow(np.linspace(0, 1, num_gaussians))
     fig, axes = plt.subplots(1, 4, figsize=(20, 5), dpi=200)
@@ -75,10 +76,8 @@ def plot_gaussians(
 
     fig.tight_layout(pad=0.1)
 
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
-        plt.close(fig)
-        return distr_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "Distribution", fig, step=step)
     else:
         plt.show()
 
@@ -96,9 +95,10 @@ def plot_swiss_roll(
     x_lim: tuple[float, float] = (-2.5, 2.5),
     y_lim: tuple[float, float] = (-2.5, 2.5),
     arrows_num: int = 8,
-    log: bool = False,
+    experiment=None,
+    step: int | None = None,
     save_dir: str | None = None,
-) -> dict[str, wandb.Image] | None:
+) -> None:
     num_starting_points = len(starting_points)
     colors = cm.rainbow(np.linspace(0.1, 0.9, num_starting_points))
     num_subplots = 3 + len(models_dict)
@@ -296,9 +296,7 @@ def plot_swiss_roll(
             fig.savefig(filename, bbox_inches=extent.expanded(1.2, 1.2))
             print(f"Saved {filename}")
 
-    if log:
-        distr_dict = {"Distribution": wandb.Image(fig)}
-        plt.close(fig)
-        return distr_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "Distribution", fig, step=step)
     else:
         plt.show()

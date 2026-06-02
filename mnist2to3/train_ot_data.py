@@ -30,7 +30,7 @@ from src.utils.dataset.colored_mnist import (
 )
 from src.utils.train import update_average
 
-WANDB_PROJECT_NAME = "eot"
+COMET_PROJECT_NAME = "eot"
 DISCRETE_OT_DIR = "../src/discreteot"
 sys.path.append(DISCRETE_OT_DIR)
 from src.discreteot import DiscreteEOT_l2sq
@@ -54,7 +54,7 @@ CONFIG_FILE = "./config_locker/{}.json".format(EXP_NAME)
 FROM_ITERATION = args.from_iteration
 EVAL = False  # True
 FULL_DEVICE = args.device
-USE_WANDB = True
+USE_COMET = True
 
 
 #######################
@@ -287,10 +287,9 @@ r_s_t_record = torch.zeros(config["num_train_iters"]).to(
     device
 )  # average image gradient magnitude along Langevin path
 
-if USE_WANDB:
-    # wandb.init(name=EXP_NAME, project=WANDB_PROJECT_NAME, reinit=True, config=config)
-    # print("WandB has initialized.")
-    experiment = Experiment(project_name=WANDB_PROJECT_NAME)
+experiment = None
+if USE_COMET:
+    experiment = Experiment(project_name=COMET_PROJECT_NAME)
     experiment.set_name(EXP_NAME)
     experiment.log_parameters(config)
     print("Comet ML has initialized.")
@@ -400,15 +399,13 @@ else:
         for lr_gp in optimizer.param_groups:
             lr_gp["lr"] = max(config["lr_min"], lr_gp["lr"] * config["lr_decay"])
 
-        # update wandb data
-        if USE_WANDB:
+        if USE_COMET:
             res_dict = {
                 "d_s_t": d_s_t.detach().data,
                 "r_s_t": r_s_t,
                 "cost": paired_loss.detach().data,
                 "cost_grad_s_t": cost_grad_s_t,
             }
-            # wandb.log({"train": res_dict}, step=i)
             experiment.log_metrics(res_dict, step=i)
 
         # print and save learning info
@@ -447,8 +444,6 @@ else:
                 experiment=experiment,
                 save_dir=Path(EXP_DIR) / "shortrun",
             )
-            # wandb.log(pbuff_dict | cost_dict, step=i)
-
             if config["shortrun_init"] == "persistent":
                 plot_images(
                     "Ys from pbuff",
@@ -496,8 +491,10 @@ else:
                     experiment=experiment,
                     save_dir=Path(EXP_DIR) / "longrun",
                 )
-                # wandb.log(longrun_dict, step=i)
                 print("{:>6d}   Long-run samples for init {} saved.".format(i + 1, init_type))
 
         # WARNING: To reduce memory leakage
         # del samp_q_y, y_s_t, x_s_t, r_s_t
+
+if experiment is not None:
+    experiment.end()

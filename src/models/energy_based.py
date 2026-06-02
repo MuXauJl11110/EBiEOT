@@ -1,9 +1,9 @@
 import os
 
 import torch
+
 from configs.energy_based.model import EBMConfig
 from configs.energy_based.sampling import LangevinConfig, PseudoLangevinConfig
-
 from src.costs.base import BaseCost
 from src.models.base import BaseGenerativeModel
 from src.potentials.base import BasePotential

@@ -9,7 +9,7 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
-import wandb
+from comet_ml import Experiment
 from torch import optim
 from tqdm import tqdm
 
@@ -134,8 +134,6 @@ args = dotdict(args)
 
 if __name__ == "__main__":
     device = torch.device("cuda")
-    os.system("wandb login <your token>")
-
     torch.set_default_device(device)
     dtype = torch.float32
     torch.torch.set_default_dtype(dtype)
@@ -143,7 +141,9 @@ if __name__ == "__main__":
     torch.manual_seed(OUTPUT_SEED)
     np.random.seed(OUTPUT_SEED)
 
-    wandb.init(name=EXP_NAME, project="inverse_ot", config=config)
+    experiment = Experiment(project_name="inverse_ot")
+    experiment.set_name(EXP_NAME)
+    experiment.log_parameters(config)
 
     X_sampler = StandardNormalSampler(dim=2, device=device)
     Y_sampler = SwissRollSampler(dim=2, device=device, dtype=dtype)
@@ -278,7 +278,7 @@ if __name__ == "__main__":
         errD = errD_real + errD_fake
 
         history.D_loss.append(errD.item())
-        wandb.log({f"D Loss": errD}, step=step)
+        experiment.log_metric("D Loss", errD.item(), step=step)
 
         ###################################
         # Update weights of netD
@@ -322,7 +322,7 @@ if __name__ == "__main__":
         optimizerG.step()
         history.G_loss.append(errG.item())
 
-        wandb.log({f"G Loss": errG}, step=step)
+        experiment.log_metric("G Loss", errG.item(), step=step)
         # LR-Scheduling step
         schedulerG.step()
         schedulerD.step()
@@ -332,3 +332,5 @@ if __name__ == "__main__":
 
         gc.collect()
         torch.cuda.empty_cache()
+
+    experiment.end()

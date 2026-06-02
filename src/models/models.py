@@ -26,8 +26,6 @@ from nflows.transforms.permutations import RandomPermutation, ReversePermutation
 from torch import optim
 from tqdm import tqdm
 
-import wandb
-
 
 class ConditionalRealNVP(Flow):
     def __init__(

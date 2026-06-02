@@ -9,7 +9,7 @@ import random
 import numpy as np
 import torch
 import torch.nn.functional as F
-import wandb
+from comet_ml import Experiment
 from tqdm import tqdm
 
 from src.auxiliary_models.generative import MLPnet
@@ -20,8 +20,6 @@ from src.utils.paired import generate_paired_data, get_GT_points, get_paired_sam
 
 if __name__ == "__main__":
     device = torch.device("cuda")
-    os.system("wandb login <your token>")
-
     X_DIM = 2
     Y_DIM = 2
     assert X_DIM > 1
@@ -96,7 +94,9 @@ if __name__ == "__main__":
         L_PAIRED_SAMPLES=L_PAIRED_SAMPLES,
     )
 
-    wandb.init(name=EXP_NAME, project="inverse_ot", config=config)
+    experiment = Experiment(project_name="inverse_ot")
+    experiment.set_name(EXP_NAME)
+    experiment.log_parameters(config)
 
     X_sampler = StandardNormalSampler(dim=2, device=device)
     Y_sampler = SwissRollSampler(dim=2, device=device, dtype=dtype)
@@ -155,9 +155,11 @@ if __name__ == "__main__":
         T_loss.backward()
         T_opt_paired.step()
 
-        wandb.log({f"Loss": T_loss}, step=step)
+        experiment.log_metric("Loss", T_loss.item(), step=step)
 
         if (step + 1) % SAVE_EVERY == 0:
             torch.save(T.state_dict(), os.path.join(OUTPUT_MODEL_PATH, f"T_{step}.pt"))
         gc.collect()
         torch.cuda.empty_cache()
+
+    experiment.end()

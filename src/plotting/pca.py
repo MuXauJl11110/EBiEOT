@@ -3,7 +3,7 @@ import torch.nn as nn
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 
-import wandb
+from src.plotting.comet_logging import log_matplotlib_figure
 
 
 def plot_PCA(
@@ -13,8 +13,9 @@ def plot_PCA(
     paired_source_data: torch.Tensor,
     paired_target_data: torch.Tensor,
     lims: tuple[tuple] = ((-25, 50), (-25, 30)),
-    log: bool = False,
-) -> dict[str, wandb.Image] | None:
+    experiment=None,
+    step: int | None = None,
+) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(12, 4), squeeze=True, sharex=True, sharey=True)
     pca = PCA(n_components=2).fit(target_data.cpu().numpy())
 
@@ -77,9 +78,7 @@ def plot_PCA(
 
     fig.tight_layout(pad=0.5)
 
-    if log:
-        distr_dict = {"PCA samples": wandb.Image(fig)}
-        plt.close(fig)
-        return distr_dict
+    if experiment is not None:
+        log_matplotlib_figure(experiment, "PCA samples", fig, step=step)
     else:
         plt.show()
