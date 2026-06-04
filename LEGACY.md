@@ -1,8 +1,16 @@
 # Legacy experiments (`legacy/ebieot-nn`)
 
-Frozen **pre-Hydra EgEOT / energy-based IOT** line (formerly branch `EBM`). Use **`main`** for active development (`conf/`, `src/ebieot/`, Hydra notebooks). Check out this branch only when you need to reproduce an experiment from the old layout.
+Frozen **pre-Hydra EgEOT / energy-based IOT** line (formerly branch `EBM`).
 
-If you previously tracked `origin/EBM`, run `git fetch origin && git checkout legacy/ebieot-nn`.
+**Active development is on [`main`](https://github.com/MuXauJl11110/EBiEOT/tree/main)** (`conf/`, `src/ebieot/`, Hydra notebooks).
+See the [README on `main`](https://github.com/MuXauJl11110/EBiEOT/blob/main/README.md) for the current workflow.
+Check out this branch only when you need to reproduce an experiment from the old layout.
+
+If you previously tracked `origin/EBM`, run:
+
+```bash
+git fetch origin && git checkout legacy/ebieot-nn
+```
 
 ## Checkout
 
@@ -11,9 +19,10 @@ git checkout legacy/ebieot-nn
 pip install -r requirements.txt
 ```
 
-On **`main`**, dependencies are managed with [uv](https://github.com/astral-sh/uv): `uv sync`.
+On **`main`**, use `uv sync` from the [main README](https://github.com/MuXauJl11110/EBiEOT/blob/main/README.md).
 
-Preservation tag for the pre-docs code tip: `legacy/ebm`. Documented tip: `legacy/ebieot-nn`.
+Preservation tag for the pre-docs code tip: `legacy/ebm`.
+Documented tip: `legacy/ebieot-nn`.
 
 ## Experiment map
 
@@ -39,10 +48,12 @@ Preservation tag for the pre-docs code tip: `legacy/ebm`. Documented tip: `legac
 
 ## Related branches
 
+- **`legacy/ebieot-gmm-alae`** — pre-Hydra GMM / ALAE line. See README and `LEGACY.md` on that branch.
 - **`legacy/ebm-alae`** — merged EBM + ALAE snapshot (includes ALAE notebooks and `light_sb` models). See its `LEGACY.md` for the combined experiment map.
 - Tag **`legacy/ebm`** — EBM tip before this rename/docs commit.
 - Tag **`legacy/ebieot-nn`** — this branch tip (includes this file).
 
 ## Verification
 
-Full notebook runs require datasets and long training and were not re-executed for this documentation. After checkout, re-run the notebook or script for your experiment.
+Full notebook runs require datasets and long training and were not re-executed for this documentation.
+After checkout, re-run the notebook or script for your experiment.
