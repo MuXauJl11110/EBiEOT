@@ -70,3 +70,9 @@ Optional: experiments may import `comet_ml`; it is not listed in `pyproject.toml
 | `icml2026.tex` | Paper manuscript. |
 | `pyproject.toml` / `uv.lock` | uv project metadata and lockfile. |
 | `requirements.txt` | Legacy pip dependency list. |
+
+## Legacy branch (`ebieot-gmm-alae`)
+
+Pre-Hydra GMM/ALAE layout. Use **`main`** for Hydra (`conf/`, `src/ebieot/`). See [LEGACY.md](LEGACY.md).
+
+Preservation tags: `legacy/alae` (pre-docs tip), `legacy/ebieot-gmm-alae` (documented tip).
