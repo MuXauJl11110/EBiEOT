@@ -1,0 +1,20 @@
+# @package _global_
+
+# Root Hydra config. Pick experiment via CLI, e.g.
+#   python scripts/train.py experiment=egeot_swiss_roll
+defaults:
+  - _self_
+  - paths: default
+  - extras: default
+  - hydra: default
+  - experiment: egeot_swiss_roll
+  - logger: null
+  - debug: null
+  - optional local: default
+
+task_name: train
+
+tags: ["dev"]
+
+# Optional global seed; experiments may still set train.seed
+seed: null

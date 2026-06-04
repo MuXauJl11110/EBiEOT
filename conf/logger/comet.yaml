@@ -1,0 +1,9 @@
+# Native comet_ml logger. Wired in scripts/train.py via logging_utils.
+project: ebieot
+entity: null
+save_dir: ${paths.output_dir}
+offline: false
+id: null
+tags: []
+group: ""
+job_type: ""

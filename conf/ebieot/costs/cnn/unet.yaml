@@ -1,0 +1,7 @@
+_convert_: all
+_target_: src.ebieot.costs.cnn.UNetCost
+n_c: ${dataset.channels}
+num_layers: 3
+base_filters: 64
+x_dim: ${dataset.x_dim}
+y_dim: ${dataset.y_dim}

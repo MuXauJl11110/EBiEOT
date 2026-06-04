@@ -1,0 +1,21 @@
+# @package _global_
+defaults:
+  - /train: classification
+  - /dataset: mnist_classification/default
+  - /ebieot/model/classification@ebieot.model: default
+  - _self_
+
+method: classification
+
+train:
+  name: Classification_Based_MNIST
+  paired_batch_size: 64
+  unpaired_batch_size: 128
+  eval_batch_size: 512
+  epochs_max: 25
+  patience: 6
+  ema_decay: 0.999
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  grad_clip: 5.0
+  log_every: 1

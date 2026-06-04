@@ -1,0 +1,17 @@
+# Weather translation dataset (June source -> January target locations).
+x_dim: 188
+y_dim: 94
+P_XY_paired: 90
+Q_X_unpaired: 500
+R_Y_unpaired: 500
+batch_size: 32
+sampling_batch_size: 128
+data_root: ../tabred/kal/weather
+n_chosen_locations: 200
+
+minibatch:
+  method: sinkhorn
+  reg: 0.05
+  reg_m: 1.0
+  cost_function: rotation-v2
+  normalize_cost: false

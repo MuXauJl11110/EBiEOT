@@ -1,0 +1,3 @@
+input_size: ${dataset.x_dim}
+hidden_size: 256
+num_hidden_layers: 4

@@ -1,0 +1,4 @@
+_convert_: all
+_target_: src.ebieot.costs.cnn.SquareCost
+x_dim: ${dataset.x_dim}
+y_dim: ${dataset.y_dim}

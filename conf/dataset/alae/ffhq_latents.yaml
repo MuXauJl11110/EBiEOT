@@ -1,0 +1,9 @@
+# FFHQ ALAE latent space (512-d); paired OT under data_root/pairs/{INPUT}->{TARGET}
+x_dim: 512
+y_dim: 512
+data_root: datasets/FFHQ
+train_size: 60000
+test_size: 10000
+P_XY_paired: 5600
+Q_X_unpaired: 48786
+R_Y_unpaired: 10762

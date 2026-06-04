@@ -1,0 +1,28 @@
+# EBiEOT coding standards (paper: arXiv:2410.02628)
+
+## Naming
+- Documentation and logs: **EBiEOT-GMM** (GMM parameterization), **EBiEOT-NN** (neural parameterization).
+- Python classes: `EbieotGmm`, `EbieotNn`, `ClassificationBasedEBiEOT` (PascalCase).
+- Functions, variables, modules: `snake_case` only (no camelCase).
+
+## Style (strict)
+- Do NOT use `from __future__ import annotations`.
+- Do NOT use camelCase for parameters or locals.
+- Do NOT add type hints to obvious PyTorch overrides or thin math wrappers.
+- Do NOT introduce single-purpose throwaway variables; inline when clearer.
+- Minimize private names prefixed with `_`; use public names unless required for buffers/encapsulation.
+
+## Imports and layout
+- Run from repo root (`EBiEOT/`); `conf/` must be discoverable.
+- Library imports: `from src.ebieot...`, `from src.utils...`, `from src.networks...`, `from src.baselines...`.
+- Notebooks: use `src.utils.notebook_setup.ensure_repo_imports` and `load_train_builders`.
+- Hydra entry points: `scripts/train.py`, `scripts/train_baseline.py`.
+
+## Correctness
+- Generative density ρ_θ must be normalized (integrates to 1); never assume it can vanish everywhere.
+- MMD kernels: keep RBF PSD; mixture kernels are convex combinations of PSD kernels.
+- `scatter_add_`: index tensor must match the rank of the destination tensor.
+- Evaluation prose: use accurate comparative language (e.g. "significantly better") when metric gaps are large.
+
+## Dependencies
+- Use `uv sync` / `uv run` with `pyproject.toml`; do not add unpinned duplicate deps to `requirements.txt`.

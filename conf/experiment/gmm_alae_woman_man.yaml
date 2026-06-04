@@ -1,0 +1,37 @@
+# @package _global_
+# WOMAN -> MAN (legacy ALAE direction notebook)
+defaults:
+  - /train: gmm
+  - /dataset: alae/ffhq_latents
+  - /ebieot/model/gmm@ebieot.model: default
+  - /ebieot/costs/lse@ebieot.cost: mlp_lse
+  - _self_
+
+method: gmm
+
+dataset:
+  input_data: WOMAN
+  target_data: MAN
+
+ebieot:
+  model:
+    y_dim: 512
+    n_potentials: 10
+    epsilon: 1.0
+  cost:
+    m_potentials: 10
+    log_v_m_hidden_channels: [10]
+    b_m_hidden_channels: [5120]
+
+train:
+  name: GMM_ALAE_WOMAN_MAN
+  steps_to: 10001
+  paired_batch_size: 128
+  unpaired_batch_size: 128
+  log_every: 1
+  plot_every: 1000
+  optimizer:
+    paired:
+      lr: 1.0e-4
+    unpaired:
+      lr: 3.0e-4

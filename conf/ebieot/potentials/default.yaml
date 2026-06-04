@@ -1,0 +1,8 @@
+_convert_: all
+_target_: src.ebieot.potentials.nn.MLPPotential
+input_dim: ${dataset.y_dim}
+hidden_layers: [256, 256]
+activation_function:
+  _target_: torch.nn.LeakyReLU
+  _partial_: true
+  negative_slope: 0.2

@@ -1,0 +1,13 @@
+# Shared toy defaults + OT minibatch for Swiss–roll experiments
+x_dim: 2
+y_dim: 2
+P_XY_paired: 1024
+Q_X_unpaired: 1024
+R_Y_unpaired: 1024
+
+minibatch:
+  method: sinkhorn
+  reg: 0.05
+  reg_m: 1.0
+  cost_function: rotation-v2
+  normalize_cost: false

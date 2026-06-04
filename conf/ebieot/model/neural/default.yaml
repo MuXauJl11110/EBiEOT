@@ -1,0 +1,22 @@
+# Scalar args for EbieotNn (EBiEOT-NN); cost/potential/buffer assembled in train.py
+sampler_type: pseudo
+epsilon: 1.0
+alpha: 0.0
+reference_data_noise_sigma: 0.0
+step_size: 0.05
+noise: 0.005
+num_iterations: 100
+decay: 1.0
+thresh: null
+grad_proj_type: none
+norm_thresh: 1.0
+value_thresh: 0.01
+projection:
+  min: 0.0
+  max: 1.0
+  is_projected: false
+compute_stats: false
+buffer:
+  replay_p: 0.95
+  max_samples: 10000
+  noise_std: 1.0

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ebieot"
+version = "0.1.0"
+description = "Inverse Entropic Optimal Transport (EBiEOT-GMM / EBiEOT-NN)"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "torch>=2.3.1",
+    "torchvision>=0.18.1",
+    "numpy>=2.1.1",
+    "matplotlib>=3.9.2",
+    "pandas>=2.2.3",
+    "scikit-learn>=1.5.2",
+    "POT>=0.9.4",
+    "Pillow>=10.4.0",
+    "tqdm>=4.66.4",
+    "papermill>=2.6.0",
+    "nflows>=0.14",
+    "gensim>=4.3",
+    "hydra-core>=1.3.2",
+    "hydra-colorlog>=1.2.0",
+    "omegaconf>=2.3.0",
+    "geomloss>=0.2.6",
+    "geotorch>=0.3.0",
+    "comet-ml>=3.45.1",
+    "optuna>=3.6.1",
+    "plotly>=5.24.1",
+    "pydantic>=2.9.2",
+    "scrapbook>=0.5.0",
+    "rich",
+    "rootutils",
+]
+
+[project.optional-dependencies]
+wandb = ["wandb>=0.18.3"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ebieot", "src/utils", "src/networks", "src/baselines"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

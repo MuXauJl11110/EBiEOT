@@ -1,0 +1,12 @@
+# @package _global_
+defaults:
+  - /train: gmm
+  - /dataset: synthetic/swiss_roll
+  - /ebieot/model/gmm@ebieot.model: default
+  - /ebieot/costs/lse@ebieot.cost: mlp_lse
+  - _self_
+
+method: gmm
+
+train:
+  name: GMM_AFHQ

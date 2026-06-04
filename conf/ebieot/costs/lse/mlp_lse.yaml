@@ -1,0 +1,14 @@
+_convert_: all
+_target_: src.ebieot.costs.lse.MLPLSECost
+x_dim: ${dataset.x_dim}
+y_dim: ${dataset.y_dim}
+m_potentials: 5
+epsilon: 1.0
+log_v_m_hidden_channels: [128, 128]
+b_m_hidden_channels: [256, 256]
+log_v_m_activation_layer:
+  _target_: torch.nn.ReLU
+  _partial_: true
+b_m_activation_layer:
+  _target_: torch.nn.ReLU
+  _partial_: true

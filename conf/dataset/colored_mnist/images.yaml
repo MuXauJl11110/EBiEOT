@@ -1,0 +1,27 @@
+# Colored MNIST 2→3 in image space (C×H×W) for CNN EBiEOT
+channels: 3
+img_size: 32
+x_dim: 3072
+y_dim: 3072
+use_images: true
+
+source_dataset: MNIST
+target_dataset: MNIST
+source_digit: 2
+target_digit: 3
+hue_offset: 120.0
+
+P_XY_paired: 500
+Q_X_unpaired: 5958
+R_Y_unpaired: 6131
+
+max_source_samples: 10000
+max_target_samples: 20000
+data_root: ${paths.root_dir}/data
+
+minibatch:
+  method: sinkhorn
+  reg: 0.05
+  reg_m: 1.0
+  cost_function: l2
+  normalize_cost: false

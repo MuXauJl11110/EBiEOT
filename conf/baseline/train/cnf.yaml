@@ -1,0 +1,9 @@
+name: CNF_Swiss_Roll
+seed: 42
+batch_size: 128
+steps_from: 0
+steps_to: 2500000
+save_every: 100000
+log_every: 100
+lr: 3.0e-4
+weight_decay: 0.01

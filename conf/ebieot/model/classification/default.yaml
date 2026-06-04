@@ -1,0 +1,10 @@
+num_classes: 10
+in_channels: 1
+image_size: 28
+epsilon: 0.5
+arch: cnn
+mlp_embed_dim: 32
+cnn_embed_dim: 64
+hidden_dim: 128
+mlp_hidden_dim: 256
+cnn_hidden_dim: 128

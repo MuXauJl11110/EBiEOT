@@ -1,0 +1,8 @@
+# @package _global_
+defaults:
+  - egeot_colored_mnist_cnn_vanilla
+  - override /ebieot/costs/cnn@ebieot.cost: unet
+  - _self_
+
+train:
+  name: Neural_CNN_UNet_Colored_MNIST

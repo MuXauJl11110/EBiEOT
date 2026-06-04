@@ -1,0 +1,5 @@
+# Dependencies are managed with uv. From the repo root:
+#   uv sync
+#   uv run pytest
+#
+# Optional: uv export --no-hashes -o requirements-lock.txt

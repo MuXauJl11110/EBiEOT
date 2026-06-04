@@ -1,0 +1,6 @@
+# EbieotGmm (EBiEOT-GMM) hyperparameters
+n_potentials: 50
+y_dim: 2
+epsilon: 1.0
+sampling_batch_size: 128
+A_diagonal_init: 0.1

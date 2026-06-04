@@ -1,0 +1,7 @@
+_convert_: all
+_target_: src.ebieot.costs.cnn.VanillaCost
+n_c: ${dataset.channels}
+n_f: 32
+leak: 0.05
+x_dim: ${dataset.x_dim}
+y_dim: ${dataset.y_dim}

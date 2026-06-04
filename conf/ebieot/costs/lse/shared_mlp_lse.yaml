@@ -1,0 +1,11 @@
+_convert_: all
+_target_: src.ebieot.costs.lse.SharedMLPLSECost
+x_dim: ${dataset.x_dim}
+y_dim: ${dataset.y_dim}
+shared_hidden_channels: [128, 128]
+m_potentials: 25
+epsilon: 1.0
+activation_layer:
+  _target_: torch.nn.SiLU
+  _partial_: true
+use_layer_norm: true

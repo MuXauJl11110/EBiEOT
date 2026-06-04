@@ -1,0 +1,9 @@
+# Standard MNIST for energy-based semi-supervised classification
+data_root: ${paths.root_dir}/data/mnist
+num_classes: 10
+in_channels: 1
+image_size: 28
+paired_per_class: 20
+unpaired_per_class: 200
+val_ratio: 0.25
+num_workers: 0

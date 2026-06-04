@@ -1,0 +1,32 @@
+# @package _global_
+defaults:
+  - /train: gmm
+  - /dataset: weather/default
+  - /ebieot/model/gmm@ebieot.model: default
+  - /ebieot/costs/lse@ebieot.cost: mlp_lse
+  - _self_
+
+method: gmm
+
+ebieot:
+  model:
+    n_potentials: 10
+    y_dim: ${dataset.y_dim}
+    epsilon: 0.01
+    sampling_batch_size: ${dataset.sampling_batch_size}
+    A_diagonal_init: 0.5
+  cost:
+    m_potentials: 10
+    log_v_m_hidden_channels: [10]
+    b_m_hidden_channels: [940]
+
+train:
+  name: GMM_Weather
+  paired_batch_size: ${dataset.batch_size}
+  unpaired_batch_size: ${dataset.batch_size}
+  steps_to: 10000
+  optimizer:
+    paired:
+      lr: 4.0e-3
+    unpaired:
+      lr: 4.0e-3

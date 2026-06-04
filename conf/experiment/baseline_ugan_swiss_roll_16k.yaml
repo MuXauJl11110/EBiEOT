@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - /baseline/train@train: ugan
+  - /baseline/model@model: ugan
+  - /dataset: synthetic/swiss_roll_baseline
+  - _self_
+
+method: ugan
+task_name: train_baseline
+
+dataset:
+  P_XY_paired: 16000
+  Q_X_unpaired: 16000
+  R_Y_unpaired: 16000
+  paired_cache:
+    enabled: true
+
+train:
+  steps_to: 250000
+  save_every: 25000

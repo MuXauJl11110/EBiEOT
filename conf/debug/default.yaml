@@ -1,0 +1,19 @@
+# @package _global_
+
+# Short run with DEBUG logging: python scripts/train.py debug=default
+
+task_name: debug
+
+logger: null
+
+extras:
+  ignore_warnings: false
+  enforce_tags: false
+
+train:
+  steps_to: 10
+
+hydra:
+  job_logging:
+    root:
+      level: DEBUG

@@ -1,0 +1,15 @@
+defaults:
+  - optimizer/paired@optimizer.paired: gmm
+  - optimizer/unpaired@optimizer.unpaired: gmm
+  - _self_
+
+name: GMM_Swiss_Roll
+seed: 42
+paired_batch_size: 128
+unpaired_batch_size: 128
+gradient_max_norm: .inf
+steps_from: 0
+steps_to: 100000
+ema_update: false
+log_every: 50
+plot_every: 1000

@@ -1,0 +1,16 @@
+# @package _global_
+# ADULT -> CHILDREN with alternate potentials (EBiEOT-GMM ALAE preset)
+defaults:
+  - gmm_alae_adult_children
+  - _self_
+
+ebieot:
+  model:
+    n_potentials: 5
+  cost:
+    m_potentials: 3
+    log_v_m_hidden_channels: [3]
+    b_m_hidden_channels: [1536]
+
+train:
+  name: GMM_ALAE_ALT

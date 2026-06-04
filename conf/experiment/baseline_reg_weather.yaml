@@ -1,0 +1,18 @@
+# @package _global_
+defaults:
+  - /baseline/train@train: regression
+  - /baseline/model@model: regression
+  - /dataset: weather/baseline
+  - _self_
+
+method: regression
+task_name: train_baseline
+
+model:
+  input_size: ${dataset.x_dim}
+  hidden_size: ${dataset.y_dim}
+  num_hidden_layers: 1
+
+train:
+  steps_to: 10000
+  batch_size: 128

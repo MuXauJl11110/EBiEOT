@@ -1,0 +1,38 @@
+# @package _global_
+# CHILDREN -> ADULT (legacy ALAE direction notebook)
+defaults:
+  - /train: gmm
+  - /dataset: alae/ffhq_latents
+  - /ebieot/model/gmm@ebieot.model: default
+  - /ebieot/costs/lse@ebieot.cost: mlp_lse
+  - _self_
+
+method: gmm
+
+dataset:
+  input_data: CHILDREN
+  target_data: ADULT
+  unpaired_use_full_train: true
+
+ebieot:
+  model:
+    y_dim: 512
+    n_potentials: 1
+    epsilon: 1.0
+  cost:
+    m_potentials: 1
+    log_v_m_hidden_channels: [1]
+    b_m_hidden_channels: [512]
+
+train:
+  name: GMM_ALAE_CHILDREN_ADULT
+  steps_to: 10001
+  paired_batch_size: 1024
+  unpaired_batch_size: 1024
+  log_every: 1
+  plot_every: 1000
+  optimizer:
+    paired:
+      lr: 1.0e-5
+    unpaired:
+      lr: 3.0e-4

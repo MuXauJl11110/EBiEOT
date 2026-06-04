@@ -1,0 +1,23 @@
+# @package _global_
+defaults:
+  - /train: neural
+  - /dataset: synthetic/swiss_roll
+  - /ebieot/model/neural@ebieot.model: default
+  - /ebieot/costs/nn@ebieot.cost: mlp
+  - /ebieot/potentials@ebieot.potential: default
+  - _self_
+
+method: neural
+
+dataset:
+  P_XY_paired: 16000
+  Q_X_unpaired: 16000
+  R_Y_unpaired: 16000
+
+train:
+  optimizer:
+    paired:
+      lr: 5.0e-4
+  paired_batch_size: 1024
+  unpaired_batch_size: 1024
+  steps_to: 3000

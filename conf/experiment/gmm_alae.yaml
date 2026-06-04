@@ -1,0 +1,8 @@
+# @package _global_
+# Default ALAE GMM experiment; prefer direction-specific configs for training.
+defaults:
+  - gmm_alae_adult_children
+  - _self_
+
+train:
+  name: GMM_ALAE

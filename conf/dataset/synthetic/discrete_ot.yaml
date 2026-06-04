@@ -1,0 +1,3 @@
+method: sinkhorn
+reg: 0.05
+cost_function: rotation-v2

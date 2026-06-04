@@ -1,0 +1,31 @@
+# @package _global_
+defaults:
+  - /train: gmm
+  - /dataset: synthetic/swiss_roll
+  - /ebieot/model/gmm@ebieot.model: default
+  - /ebieot/costs/lse@ebieot.cost: shared_mlp_lse
+  - _self_
+
+method: gmm
+
+dataset:
+  P_XY_paired: 16000
+  Q_X_unpaired: 16000
+  R_Y_unpaired: 16000
+
+ebieot:
+  model:
+    n_potentials: 1
+  cost:
+    m_potentials: 1
+    shared_hidden_channels: [2]
+
+train:
+  steps_to: 25001
+  gradient_max_norm: 1.0
+  optimizer:
+    paired:
+      lr: 3.0e-4
+      weight_decay: 1.0e-4
+    unpaired:
+      lr: 1.0e-3

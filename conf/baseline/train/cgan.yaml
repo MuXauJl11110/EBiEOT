@@ -1,0 +1,17 @@
+name: CGAN_Swiss_Roll
+seed: 42
+batch_size: 128
+steps_from: 0
+steps_to: 250000
+save_every: 25000
+log_every: 100
+z_dim: 1
+num_timesteps: 1
+layers_g: [256, 256, 256]
+layers_d: [256, 256, 256]
+lr_g: 1.0e-3
+lr_d: 3.0e-4
+beta1: 0.5
+beta2: 0.9
+r1_gamma: 0.01
+lazy_reg: 1

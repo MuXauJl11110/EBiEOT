@@ -1,0 +1,9 @@
+_convert_: all
+_target_: src.ebieot.costs.nn.MLPCost
+x_dim: ${dataset.x_dim}
+y_dim: ${dataset.y_dim}
+hidden_layers: [256]
+activation_function:
+  _target_: torch.nn.LeakyReLU
+  _partial_: true
+  negative_slope: 0.2

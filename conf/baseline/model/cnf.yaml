@@ -1,0 +1,7 @@
+features: ${dataset.x_dim}
+context_features: ${dataset.x_dim}
+hidden_features: [128]
+hidden_context_features: 512
+num_layers: 5
+num_blocks_per_layer: 4
+use_volume_preserving: false

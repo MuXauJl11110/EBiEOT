@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - /baseline/train@train: cnf
+  - /baseline/model@model: cnf
+  - /dataset: synthetic/swiss_roll_baseline
+  - _self_
+
+method: cnf
+task_name: train_baseline
+
+dataset:
+  P_XY_paired: 16000
+  Q_X_unpaired: 0
+  R_Y_unpaired: 1024
+  paired_cache:
+    enabled: true
+
+train:
+  steps_to: 2500000
+  save_every: 100000

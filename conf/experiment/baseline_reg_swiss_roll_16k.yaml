@@ -1,0 +1,20 @@
+# @package _global_
+defaults:
+  - /baseline/train@train: regression
+  - /baseline/model@model: regression
+  - /dataset: synthetic/swiss_roll_baseline
+  - _self_
+
+method: regression
+task_name: train_baseline
+
+dataset:
+  P_XY_paired: 16000
+  Q_X_unpaired: 0
+  R_Y_unpaired: 1024
+  paired_cache:
+    enabled: true
+
+train:
+  steps_to: 250000
+  save_every: 25000
