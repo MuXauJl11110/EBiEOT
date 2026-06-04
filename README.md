@@ -14,7 +14,7 @@
 [![arXiv Paper](https://img.shields.io/badge/arXiv-2410.02628-b31b1b)](https://arxiv.org/abs/2410.02628)
 [![OpenReview Paper](https://img.shields.io/badge/OpenReview-PDF-8c1b13)](https://openreview.net/forum?id=0p617sK4Z4)
 [![GitHub](https://img.shields.io/github/stars/MuXauJl11110/EBiEOT?style=social)](https://github.com/MuXauJl11110/EBiEOT)
-![GitHub License](https://img.shields.io/github/license/MuXauJl11110/EBiEOT)
+![GitHub License](https://img.shields.io/github/license/MuXauJl11110/EBiEOT?style=flat&label=License)
 
 </div>
 
